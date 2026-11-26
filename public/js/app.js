@@ -208,7 +208,7 @@ function runBudget() {
   const day = computeDay(checked.plan, state.forecast);
   const top = [...day.members].sort((a, b) => b.cigarettes - a.cigarettes)[0];
   const topName = checked.plan.members.find((m) => m.id === top.memberId)?.name;
-  el.resultsStatus.textContent = `Updated. ${topName} breathes the most today: about ${top.cigarettes.toFixed(1)} cigarettes' worth.`;
+  el.resultsStatus.textContent = `Updated. ${topName} breathes the most on this day: about ${top.cigarettes.toFixed(1)} cigarettes' worth.`;
   renderStats(el.stats, day, computeDay(optimizeDay(checked.plan, state.forecast).plan, state.forecast));
   renderHourGrid(el.hourGrid, checked.plan, state.forecast, memberTimeline);
   renderBudget(el.budget, checked.plan, day);

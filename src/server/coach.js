@@ -44,7 +44,7 @@ export function buildFacts(plan, pm) {
     day,
     tips,
     facts: {
-      airToday: { worstPm25: Math.max(...valid), cleanestPm25: Math.min(...valid), cleanestHour: pm.indexOf(Math.min(...valid)) },
+      airThatDay: { worstPm25: Math.max(...valid), cleanestPm25: Math.min(...valid), cleanestHour: pm.indexOf(Math.min(...valid)) },
       people: plan.members.map((m, i) => ({
         name: m.name,
         group: m.ageGroup,
@@ -74,7 +74,7 @@ export function buildFacts(plan, pm) {
 export function templateCoach(f) {
   const top = [...f.people].sort((a, b) => b.priority * b.inhaledMicrograms - a.priority * a.inhaledMicrograms)[0];
   const summary =
-    `Today's air peaks at ${f.airToday.worstPm25} µg/m³ and is cleanest around ${f.airToday.cleanestHour}:00. ` +
+    `The air peaks at ${f.airThatDay.worstPm25} µg/m³ and is cleanest around ${f.airThatDay.cleanestHour}:00. ` +
     `${top.name} needs the most protection, breathing about ${top.cigaretteEquivalent} cigarettes' worth of smoke. ` +
     `Applying the free changes cuts the family's dose by ${Math.abs(f.ifAllFreeChangesApplied.familyDoseChangePercent)}%.`;
   const tips = f.suggestions.slice(0, 4).map((s) => {

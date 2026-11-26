@@ -54,7 +54,7 @@ export function renderBudget(el, plan, day) {
         return h('article', { class: 'person', 'aria-labelledby': `p-${m.id}` },
           h('h3', { id: `p-${m.id}` }, m.name, m.sensitive || m.ageGroup === 'child' || m.ageGroup === 'senior' ? h('span', { class: 'tag' }, m.sensitive ? 'Sensitive' : AGE_GROUPS[m.ageGroup].label.split(' ')[0]) : null),
           h('p', { class: 'big' }, `≈ ${fmt1(r.cigarettes)}`, h('span', { class: 'sr-only' }, ' ')),
-          h('p', { class: 'hint' }, `cigarettes' worth of smoke today · ${fmt(r.total)} µg PM2.5 inhaled`),
+          h('p', { class: 'hint' }, `cigarettes' worth of smoke in the day · ${fmt(r.total)} µg PM2.5 inhaled`),
           h('div', { class: 'meter', role: 'img', 'aria-label': `${fmt1(r.cigarettes)} cigarette equivalents` }, h('span', { style: `width:${Math.min(100, (r.cigarettes / worst) * 100)}%` })),
           h('p', null, `${fmt1(r.whoMultiple)}× what the same breaths would carry at the WHO guideline (${WHO_24H_PM25} µg/m³).`),
           r.missingHours ? h('p', { class: 'hint' }, `${r.missingHours} hours had no forecast and were skipped.`) : null,
@@ -62,7 +62,7 @@ export function renderBudget(el, plan, day) {
       }),
     ),
     h('div', { class: 'city' },
-      h('strong', null, 'What your trips add to the city today: '),
+      h('strong', null, 'What your trips add to the city that day: '),
       `${fmt1(day.emissions.co2 / 1000)} kg CO₂ and ${fmt(day.emissions.pm)} mg of PM2.5 from exhaust, brakes and tyres.`,
     ),
   );
@@ -93,7 +93,7 @@ export function impactChips(impact) {
  */
 export function renderSuggestions(el, suggestions, onTry) {
   if (!suggestions.length) {
-    el.replaceChildren(h('li', null, 'Your day is already well planned for today’s air. Nothing more to gain.'));
+    el.replaceChildren(h('li', null, 'Your day is already well planned for this day’s air. Nothing more to gain.'));
     return;
   }
   el.replaceChildren(
@@ -161,7 +161,7 @@ export function renderStats(el, day, smarter) {
   const stat = (/** @type {string} */ k, /** @type {Node[]} */ v, /** @type {string} */ d, /** @type {string} */ cls = '') =>
     h('div', { class: 'stat' }, h('p', { class: 'k' }, k), h('p', { class: `v ${cls}` }, ...v), h('p', { class: 'd' }, d));
   el.replaceChildren(
-    stat('Your family today, as planned', [fmt(day.total), h('small', null, 'µg')], `of PM2.5 inhaled from ${fmt1(volume)} m³ of air`),
+    stat('Your family’s day, as planned', [fmt(day.total), h('small', null, 'µg')], `of PM2.5 inhaled from ${fmt1(volume)} m³ of air`),
     stat('Compared with clean air', [`${fmt1(who)}×`], `the dose of breathing the same air at the WHO guideline (${WHO_24H_PM25} µg/m³)`, 'warn'),
     cut >= 0.5
       ? stat('With the smarter plan', [`−${Math.round(cut)}%`], `${fmt(smarter.total)} µg · trips ${fmt1(smarter.emissions.co2 / 1000)} kg CO₂ instead of ${fmt1(day.emissions.co2 / 1000)} kg`, 'ok')

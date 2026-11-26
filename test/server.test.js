@@ -232,7 +232,7 @@ describe('server helpers', () => {
   it('template briefing only uses computed facts', () => {
     const { facts } = buildFacts(samplePlan(), SAMPLE_FORECAST);
     const t = templateCoach(facts);
-    assert.match(t.summary, new RegExp(String(facts.airToday.worstPm25)));
+    assert.match(t.summary, new RegExp(String(facts.airThatDay.worstPm25)));
     assert.equal(t.tips.length, Math.min(4, facts.suggestions.length));
   });
 });
