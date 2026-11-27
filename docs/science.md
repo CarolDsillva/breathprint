@@ -14,12 +14,12 @@ Time not covered by an activity is spent at home, asleep during sleeping hours, 
 
 **Ventilation rates (m³/h)**, US EPA Exposure Factors Handbook 2011, Table 6-2 (means, rounded):
 
-| | sleep | rest | light | moderate | vigorous |
-|---|---|---|---|---|---|
-| Child 5–11 | 0.27 | 0.29 | 0.66 | 1.32 | 2.5 |
-| Teen 12–17 | 0.29 | 0.30 | 0.74 | 1.6 | 2.9 |
-| Adult | 0.30 | 0.31 | 0.72 | 1.6 | 3.0 |
-| Senior 65+ | 0.30 | 0.29 | 0.72 | 1.5 | 2.8 |
+|            | sleep | rest | light | moderate | vigorous |
+| ---------- | ----- | ---- | ----- | -------- | -------- |
+| Child 5–11 | 0.27  | 0.29 | 0.66  | 1.32     | 2.5      |
+| Teen 12–17 | 0.29  | 0.30 | 0.74  | 1.6      | 2.9      |
+| Adult      | 0.30  | 0.31 | 0.72  | 1.6      | 3.0      |
+| Senior 65+ | 0.30  | 0.29 | 0.72  | 1.5      | 2.8      |
 
 **Cigarette equivalents** = Σ(concentration × hours) ÷ (22 × 24), after Berkeley Earth.
 **WHO multiple** = dose ÷ (15 µg/m³ × volume breathed).

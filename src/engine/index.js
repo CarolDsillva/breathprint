@@ -11,4 +11,4 @@ export { isForecast, sanitizeChange, validatePlan } from './validate.js';
 export { formatTime } from './time.js';
 export { SAMPLE_FORECAST, samplePlan } from './sample.js';
 export { communityRipple, seasonSavings, smogSeasonDaysLeft } from './impact.js';
-export { FINDINGS, FINDING_IDS, findingsToFixes, sanitizeScan } from './scan.js';
+export { FINDINGS, FINDING_IDS, findingsToFixes, isFindingId, sanitizeScan } from './scan.js';

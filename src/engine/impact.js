@@ -60,6 +60,9 @@ export function communityRipple(before, after, families) {
     co2KgAvoided: Math.max(0, ((before.emissions.co2 - after.emissions.co2) * n) / 1000),
     pmGramsNotEmitted: Math.max(0, ((before.emissions.pm - after.emissions.pm) * n) / 1000),
     pmGramsNotBreathed: Math.max(0, ((before.total - after.total) * n) / 1e6),
-    cigarettesAvoided: Math.max(0, before.members.reduce((s, m, i) => s + m.cigarettes - after.members[i].cigarettes, 0) * n),
+    cigarettesAvoided: Math.max(
+      0,
+      before.members.reduce((s, m, i) => s + m.cigarettes - after.members[i].cigarettes, 0) * n,
+    ),
   };
 }

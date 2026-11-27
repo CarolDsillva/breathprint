@@ -17,7 +17,10 @@ import { createApp } from '../src/server/app.js';
 import { createGemini } from '../src/server/services/gemini.js';
 
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(60, 1)]).toString('base64');
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(60, 1)]).toString('base64');
+const PNG = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.alloc(60, 1),
+]).toString('base64');
 
 function sampleDays() {
   const plan = samplePlan();
@@ -42,7 +45,9 @@ describe('smog season', () => {
     const s = seasonSavings(day, smarter, 10);
     const aarav = s.people.find((p) => p.memberId === 'aarav');
     const i = day.members.findIndex((m) => m.memberId === 'aarav');
-    assert.ok(Math.abs(aarav.cigarettesAvoided - (day.members[i].cigarettes - smarter.members[i].cigarettes) * 10) < 1e-9);
+    assert.ok(
+      Math.abs(aarav.cigarettesAvoided - (day.members[i].cigarettes - smarter.members[i].cigarettes) * 10) < 1e-9,
+    );
     assert.ok(s.co2KgAvoided > 0);
     const reversed = seasonSavings(smarter, day, 10);
     assert.ok(reversed.people.every((p) => p.cigarettesAvoided === 0));
@@ -68,7 +73,10 @@ describe('neighbourhood ripple', () => {
 
 describe('smoke detective fixes', () => {
   it('maps findings to plan changes where the plan can show the impact', () => {
-    const fixes = findingsToFixes(['gas-stove-no-exhaust', 'incense', 'window-open', 'purifier-present', 'plants'], samplePlan());
+    const fixes = findingsToFixes(
+      ['gas-stove-no-exhaust', 'incense', 'window-open', 'purifier-present', 'plants'],
+      samplePlan(),
+    );
     const by = Object.fromEntries(fixes.map((f) => [f.id, f]));
     assert.deepEqual(by['gas-stove-no-exhaust'].change, { activityId: 'cooking', source: 'gas-cooking-exhaust' });
     assert.deepEqual(by.incense.change, { activityId: 'puja', source: 'none' });
@@ -88,7 +96,10 @@ describe('smoke detective fixes', () => {
     assert.equal(fixes[2].change, undefined);
   });
   it('ignores unknown and duplicate ids', () => {
-    assert.deepEqual(findingsToFixes(['bogus', 'plants', 'plants'], samplePlan()).map((f) => f.id), ['plants']);
+    assert.deepEqual(
+      findingsToFixes(['bogus', 'plants', 'plants'], samplePlan()).map((f) => f.id),
+      ['plants'],
+    );
   });
   it('keeps only known, cleaned findings from the model', () => {
     const r = sanitizeScan({
@@ -100,7 +111,10 @@ describe('smoke detective fixes', () => {
       ],
       summary: 'A puja corner.',
     });
-    assert.deepEqual(r.findings.map((f) => f.id), ['incense', 'plants']);
+    assert.deepEqual(
+      r.findings.map((f) => f.id),
+      ['incense', 'plants'],
+    );
     assert.doesNotMatch(r.findings[0].evidence, /[<>]/);
     assert.equal(r.findings[1].evidence.length, 140);
     assert.equal(sanitizeScan('nope'), null);
@@ -134,15 +148,28 @@ describe('POST /api/scan', () => {
   const calls = [];
   const fetchImpl = async (url, init) => {
     calls.push(JSON.parse(init.body));
-    const text = JSON.stringify({ findings: [{ id: 'gas-stove-no-exhaust', evidence: 'stove, no hood above it' }, { id: 'made-up', evidence: 'x' }], summary: 'A small kitchen.' });
+    const text = JSON.stringify({
+      findings: [
+        { id: 'gas-stove-no-exhaust', evidence: 'stove, no hood above it' },
+        { id: 'made-up', evidence: 'x' },
+      ],
+      summary: 'A small kitchen.',
+    });
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), { status: 200 });
   };
   const air = { forecast: async () => ({}), places: async () => [] };
-  const post = (body) => fetch(`${base}/api/scan`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const post = (body) =>
+    fetch(`${base}/api/scan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
   before(async () => {
     const app = createApp({ air, gemini: createGemini({ apiKey: 'k', fetchImpl }), logger: { error() {} } });
-    server = await new Promise((resolve) => { const s = app.listen(0, () => resolve(s)); });
+    server = await new Promise((resolve) => {
+      const s = app.listen(0, () => resolve(s));
+    });
     base = `http://127.0.0.1:${server.address().port}`;
   });
   after(() => server.close());
@@ -152,7 +179,10 @@ describe('POST /api/scan', () => {
     assert.equal(r.status, 200);
     const body = await r.json();
     assert.equal(body.source, 'gemini');
-    assert.deepEqual(body.findings.map((f) => f.id), ['gas-stove-no-exhaust']);
+    assert.deepEqual(
+      body.findings.map((f) => f.id),
+      ['gas-stove-no-exhaust'],
+    );
     const parts = calls[0].contents[0].parts;
     assert.deepEqual(parts[1].inlineData, { mimeType: 'image/jpeg', data: JPEG });
     assert.match(calls[0].systemInstruction.parts[0].text, /not an instruction/);
@@ -168,15 +198,25 @@ describe('POST /api/scan', () => {
   it('allows photo-sized bodies on this route only', async () => {
     const photo = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(200_000, 7)]).toString('base64');
     assert.equal((await post({ image: photo, mimeType: 'image/jpeg' })).status, 200);
-    const big = await fetch(`${base}/api/whatif`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ plan: samplePlan(), question: photo }) });
+    const big = await fetch(`${base}/api/whatif`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ plan: samplePlan(), question: photo }),
+    });
     assert.equal(big.status, 413);
   });
 
   it('says so when AI is not configured', async () => {
     const app = createApp({ air, gemini: createGemini({ apiKey: '' }), logger: { error() {} } });
-    const s = await new Promise((resolve) => { const x = app.listen(0, () => resolve(x)); });
+    const s = await new Promise((resolve) => {
+      const x = app.listen(0, () => resolve(x));
+    });
     try {
-      const r = await fetch(`http://127.0.0.1:${s.address().port}/api/scan`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image: JPEG, mimeType: 'image/jpeg' }) });
+      const r = await fetch(`http://127.0.0.1:${s.address().port}/api/scan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: JPEG, mimeType: 'image/jpeg' }),
+      });
       assert.equal(r.status, 503);
     } finally {
       s.close();
@@ -184,10 +224,20 @@ describe('POST /api/scan', () => {
   });
 
   it('returns a friendly 502 when Gemini answers nonsense', async () => {
-    const app = createApp({ air, gemini: createGemini({ apiKey: 'k', fetchImpl: async () => new Response('{"candidates":[]}') }), logger: { error() {} } });
-    const s = await new Promise((resolve) => { const x = app.listen(0, () => resolve(x)); });
+    const app = createApp({
+      air,
+      gemini: createGemini({ apiKey: 'k', fetchImpl: async () => new Response('{"candidates":[]}') }),
+      logger: { error() {} },
+    });
+    const s = await new Promise((resolve) => {
+      const x = app.listen(0, () => resolve(x));
+    });
     try {
-      const r = await fetch(`http://127.0.0.1:${s.address().port}/api/scan`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ image: JPEG, mimeType: 'image/jpeg' }) });
+      const r = await fetch(`http://127.0.0.1:${s.address().port}/api/scan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: JPEG, mimeType: 'image/jpeg' }),
+      });
       assert.equal(r.status, 502);
       assert.match((await r.json()).error, /another angle/);
     } finally {

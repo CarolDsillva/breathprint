@@ -7,8 +7,23 @@ import { AGE_GROUPS, INTENSITIES, KINDS, LIMITS, MODES, SOURCES } from './consta
 
 const ID_RE = /^[a-z0-9_-]{1,24}$/i;
 
-/** @param {unknown} v */
+/**
+ * A short id of letters, digits, "_" or "-".
+ * @param {unknown} v
+ * @returns {v is string}
+ */
+const isId = (v) => typeof v === 'string' && ID_RE.test(v);
+
+/**
+ * A plain object whose fields still need checking.
+ * @param {unknown} v
+ * @returns {v is Record<string, unknown>}
+ */
 const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Control characters and angle brackets: never needed in names, labels or AI text. */
+// eslint-disable-next-line no-control-regex -- matching control characters is the point
+const UNSAFE_CHARS = /[\u0000-\u001f\u007f<>]/g;
 
 /**
  * Remove control characters and angle brackets, trim and cap length.
@@ -17,22 +32,28 @@ const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
  */
 export function cleanText(v, max) {
   if (typeof v !== 'string') return '';
-  // eslint-disable-next-line no-control-regex
-  return v.replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, max);
+  return v.replace(UNSAFE_CHARS, '').trim().slice(0, max);
 }
 
 /**
+ * A finite number within [min, max].
  * @param {unknown} v
  * @param {number} min
  * @param {number} max
+ * @returns {v is number}
  */
 const num = (v, min, max) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 
 /**
+ * One of the allowed keys.
+ * @template {string} K
  * @param {unknown} v
- * @param {readonly string[] | Record<string, unknown>} allowed
+ * @param {readonly K[] | Readonly<Record<K, unknown>>} allowed
+ * @returns {v is K}
  */
-const oneOf = (v, allowed) => typeof v === 'string' && (Array.isArray(allowed) ? allowed.includes(v) : Object.hasOwn(allowed, v));
+const oneOf = (v, allowed) =>
+  typeof v === 'string' &&
+  (Array.isArray(allowed) ? allowed.includes(/** @type {K} */ (v)) : Object.hasOwn(allowed, v));
 
 /**
  * @param {unknown} raw
@@ -42,15 +63,22 @@ export function validatePlan(raw) {
   /** @type {string[]} */
   const errors = [];
   if (!isObj(raw)) return { ok: false, errors: ['Plan must be an object.'] };
-  const r = /** @type {Record<string, any>} */ (raw);
+  const r = /** @type {Record<string, unknown>} */ (raw);
 
   const membersIn = Array.isArray(r.members) ? r.members : [];
-  if (membersIn.length < 1 || membersIn.length > LIMITS.members) errors.push(`Add between 1 and ${LIMITS.members} family members.`);
+  if (membersIn.length < 1 || membersIn.length > LIMITS.members)
+    errors.push(`Add between 1 and ${LIMITS.members} family members.`);
   /** @type {import('./dose.js').Member[]} */
   const members = [];
   for (const [i, m] of membersIn.slice(0, LIMITS.members).entries()) {
-    if (!isObj(m) || !ID_RE.test(m.id ?? '')) { errors.push(`Member ${i + 1} has an invalid id.`); continue; }
-    if (!oneOf(m.ageGroup, AGE_GROUPS)) { errors.push(`Member ${i + 1} has an unknown age group.`); continue; }
+    if (!isObj(m) || !isId(m.id)) {
+      errors.push(`Member ${i + 1} has an invalid id.`);
+      continue;
+    }
+    if (!oneOf(m.ageGroup, AGE_GROUPS)) {
+      errors.push(`Member ${i + 1} has an unknown age group.`);
+      continue;
+    }
     const name = cleanText(m.name, LIMITS.nameLength) || `Person ${i + 1}`;
     members.push({ id: m.id, name, ageGroup: m.ageGroup, sensitive: m.sensitive === true });
   }
@@ -79,31 +107,64 @@ export function validatePlan(raw) {
   const seen = new Set();
   for (const [i, a] of actsIn.slice(0, LIMITS.activities).entries()) {
     const where = `Activity ${i + 1}`;
-    if (!isObj(a) || !ID_RE.test(a.id ?? '') || seen.has(a.id)) { errors.push(`${where} has a missing or duplicate id.`); continue; }
+    if (!isObj(a) || !isId(a.id) || seen.has(a.id)) {
+      errors.push(`${where} has a missing or duplicate id.`);
+      continue;
+    }
     seen.add(a.id);
     const label = cleanText(a.label, LIMITS.labelLength) || where;
-    if (!oneOf(a.kind, KINDS)) { errors.push(`${label}: unknown kind.`); continue; }
-    if (!num(a.start, 0, 23.99)) { errors.push(`${label}: start time must be between 0 and 24.`); continue; }
-    const ids = Array.isArray(a.memberIds) ? a.memberIds.filter((/** @type {unknown} */ id) => typeof id === 'string' && memberIds.has(id)) : [];
-    if (ids.length === 0) { errors.push(`${label}: choose at least one person.`); continue; }
+    if (!oneOf(a.kind, KINDS)) {
+      errors.push(`${label}: unknown kind.`);
+      continue;
+    }
+    if (!num(a.start, 0, 23.99)) {
+      errors.push(`${label}: start time must be between 0 and 24.`);
+      continue;
+    }
+    const ids = Array.isArray(a.memberIds)
+      ? a.memberIds.filter((/** @type {unknown} */ id) => typeof id === 'string' && memberIds.has(id))
+      : [];
+    if (ids.length === 0) {
+      errors.push(`${label}: choose at least one person.`);
+      continue;
+    }
     const intensity = oneOf(a.intensity, INTENSITIES) ? a.intensity : 'rest';
     /** @type {import('./dose.js').Activity} */
-    const out = { id: a.id, label, memberIds: [...new Set(ids)], start: a.start, hours: 1, kind: a.kind, intensity, flexible: a.flexible === true };
+    const out = {
+      id: a.id,
+      label,
+      memberIds: [...new Set(ids)],
+      start: a.start,
+      hours: 1,
+      kind: a.kind,
+      intensity,
+      flexible: a.flexible === true,
+    };
     if (a.kind === 'commute') {
-      if (!oneOf(a.mode, MODES)) { errors.push(`${label}: choose a transport mode.`); continue; }
-      if (!num(a.distanceKm, 0.1, 200)) { errors.push(`${label}: distance must be 0.1–200 km.`); continue; }
+      if (!oneOf(a.mode, MODES)) {
+        errors.push(`${label}: choose a transport mode.`);
+        continue;
+      }
+      if (!num(a.distanceKm, 0.1, 200)) {
+        errors.push(`${label}: distance must be 0.1–200 km.`);
+        continue;
+      }
       out.mode = a.mode;
       out.distanceKm = a.distanceKm;
       out.hours = a.distanceKm / MODES[/** @type {keyof typeof MODES} */ (a.mode)].speed;
       out.flexible = false;
     } else {
-      if (!num(a.hours, 0.25, 16)) { errors.push(`${label}: duration must be 15 min to 16 h.`); continue; }
+      if (!num(a.hours, 0.25, 16)) {
+        errors.push(`${label}: duration must be 15 min to 16 h.`);
+        continue;
+      }
       out.hours = a.hours;
     }
     if (a.kind === 'home') out.source = oneOf(a.source, SOURCES) ? a.source : 'none';
     if (a.kind === 'outdoor') out.nearTraffic = a.nearTraffic === true;
     if (out.flexible && isObj(a.window)) {
-      if (num(a.window.from, 0, 24) && num(a.window.to, 0, 24) && a.window.to - a.window.from >= out.hours) out.window = { from: a.window.from, to: a.window.to };
+      if (num(a.window.from, 0, 24) && num(a.window.to, 0, 24) && a.window.to - a.window.from >= out.hours)
+        out.window = { from: a.window.from, to: a.window.to };
       else errors.push(`${label}: the flexible window is shorter than the activity.`);
     }
     activities.push(out);
@@ -130,10 +191,11 @@ export function isForecast(raw) {
  */
 export function sanitizeChange(raw, plan) {
   if (!isObj(raw)) return null;
-  const r = /** @type {Record<string, any>} */ (raw);
+  const r = /** @type {Record<string, unknown>} */ (raw);
   /** @type {import('./scenario.js').Change} */
   const c = {};
-  if (typeof r.activityId === 'string' && plan.activities.some((a) => a.id === r.activityId)) c.activityId = r.activityId;
+  if (typeof r.activityId === 'string' && plan.activities.some((a) => a.id === r.activityId))
+    c.activityId = r.activityId;
   if (c.activityId && num(r.start, 0, 23.99)) c.start = Math.round(r.start * 2) / 2;
   if (c.activityId && oneOf(r.mode, MODES)) c.mode = r.mode;
   if (c.activityId && oneOf(r.source, SOURCES)) c.source = r.source;

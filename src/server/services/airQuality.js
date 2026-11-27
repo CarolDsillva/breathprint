@@ -15,7 +15,10 @@ export class UpstreamError extends Error {}
 export function createAirQualityService({ fetchImpl = fetch, now = Date.now } = {}) {
   /** @param {string | URL} url */
   async function getJson(url) {
-    const res = await fetchImpl(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: 'application/json' } });
+    const res = await fetchImpl(url, {
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: { accept: 'application/json' },
+    });
     if (!res.ok) throw new UpstreamError(`Air data service answered ${res.status}`);
     return res.json();
   }
@@ -24,7 +27,13 @@ export function createAirQualityService({ fetchImpl = fetch, now = Date.now } = 
   const loadForecast = cached(forecastCache, async (key) => {
     const [lat, lon] = key.split(',');
     const url = new URL(FORECAST_URL);
-    url.search = new URLSearchParams({ latitude: lat, longitude: lon, hourly: 'pm2_5,us_aqi', timezone: 'auto', forecast_days: '2' }).toString();
+    url.search = new URLSearchParams({
+      latitude: lat,
+      longitude: lon,
+      hourly: 'pm2_5,us_aqi',
+      timezone: 'auto',
+      forecast_days: '2',
+    }).toString();
     return parseForecast(await getJson(url));
   });
 
@@ -57,8 +66,15 @@ export function createAirQualityService({ fetchImpl = fetch, now = Date.now } = 
  */
 
 /**
+ * Upstream responses, as far as we rely on them. Every field is optional because the JSON is
+ * untrusted: the parsers check each value before using it.
+ * @typedef {{ timezone?: unknown, hourly?: { time?: unknown, pm2_5?: unknown, us_aqi?: unknown } }} OpenMeteoForecast
+ * @typedef {{ name?: unknown, admin1?: unknown, country?: unknown, latitude?: unknown, longitude?: unknown }} OpenMeteoPlace
+ */
+
+/**
  * Group Open-Meteo's flat hourly arrays into 24-hour local days.
- * @param {any} body
+ * @param {OpenMeteoForecast | null | undefined} body
  * @returns {Forecast}
  */
 export function parseForecast(body) {
@@ -78,24 +94,32 @@ export function parseForecast(body) {
     day.pm25[hour] = toNum(pm[i]);
     day.aqi[hour] = Array.isArray(aqi) ? toNum(aqi[i]) : null;
   });
-  return { timezone: typeof body.timezone === 'string' ? body.timezone : 'UTC', days: [...days.values()] };
+  return { timezone: typeof body?.timezone === 'string' ? body.timezone : 'UTC', days: [...days.values()] };
 }
 
 /**
- * @param {any} body
+ * Keep only places with real coordinates.
+ * @param {{ results?: unknown } | null | undefined} body
  * @returns {Place[]}
  */
 export function parsePlaces(body) {
+  /** @type {OpenMeteoPlace[]} */
   const results = Array.isArray(body?.results) ? body.results : [];
-  return results
-    .filter((r) => Number.isFinite(r?.latitude) && Number.isFinite(r?.longitude))
-    .map((r) => ({
+  /** @type {Place[]} */
+  const places = [];
+  for (const r of results) {
+    const lat = r?.latitude;
+    const lon = r?.longitude;
+    if (typeof lat !== 'number' || typeof lon !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    places.push({
       name: String(r.name ?? ''),
       region: String(r.admin1 ?? ''),
       country: String(r.country ?? ''),
-      lat: r.latitude,
-      lon: r.longitude,
-    }));
+      lat,
+      lon,
+    });
+  }
+  return places;
 }
 
 /** @param {unknown} v */

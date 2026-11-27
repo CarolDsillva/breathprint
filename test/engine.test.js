@@ -31,7 +31,10 @@ const homeOnly = () => ({
 
 describe('time helpers', () => {
   it('splits intervals across clock hours', () => {
-    assert.deepEqual(segments(7.5, 1), [{ hour: 7, fraction: 0.5 }, { hour: 8, fraction: 0.5 }]);
+    assert.deepEqual(segments(7.5, 1), [
+      { hour: 7, fraction: 0.5 },
+      { hour: 8, fraction: 0.5 },
+    ]);
     assert.deepEqual(segments(23.5, 2), [{ hour: 23, fraction: 0.5 }], 'clipped at midnight');
   });
   it('detects overlaps and sleep hours, including windows that wrap midnight', () => {
@@ -78,7 +81,9 @@ describe('dose model', () => {
 
   it('charges more for hard exercise outdoors than for rest indoors', () => {
     const p = homeOnly();
-    p.activities = [{ id: 'run', label: 'Run', memberIds: ['a'], start: 7, hours: 1, kind: 'outdoor', intensity: 'vigorous' }];
+    p.activities = [
+      { id: 'run', label: 'Run', memberIds: ['a'], start: 7, hours: 1, kind: 'outdoor', intensity: 'vigorous' },
+    ];
     const withRun = computeDay(p, flat(100)).total;
     const without = computeDay(homeOnly(), flat(100)).total;
     // 1 h vigorous outdoors (100 × 3.0) replaces 1 h resting indoors (50 × 0.31)
@@ -87,15 +92,30 @@ describe('dose model', () => {
 
   it('adds indoor smoke from cooking and incense', () => {
     const p = homeOnly();
-    p.activities = [{ id: 'c', label: 'Cook', memberIds: ['a'], start: 19, hours: 1, kind: 'home', intensity: 'light', source: 'gas-cooking' }];
+    p.activities = [
+      {
+        id: 'c',
+        label: 'Cook',
+        memberIds: ['a'],
+        start: 19,
+        hours: 1,
+        kind: 'home',
+        intensity: 'light',
+        source: 'gas-cooking',
+      },
+    ];
     const smoky = computeDay(p, flat(100)).total;
     p.activities[0].source = 'gas-cooking-exhaust';
     assert.ok(computeDay(p, flat(100)).total < smoky);
   });
 
   it('weights children, elders and sensitive people higher', () => {
-    assert.ok(memberWeight({ ageGroup: 'child', sensitive: false }) > memberWeight({ ageGroup: 'adult', sensitive: false }));
-    assert.ok(memberWeight({ ageGroup: 'adult', sensitive: true }) > memberWeight({ ageGroup: 'adult', sensitive: false }));
+    assert.ok(
+      memberWeight({ ageGroup: 'child', sensitive: false }) > memberWeight({ ageGroup: 'adult', sensitive: false }),
+    );
+    assert.ok(
+      memberWeight({ ageGroup: 'adult', sensitive: true }) > memberWeight({ ageGroup: 'adult', sensitive: false }),
+    );
   });
 
   it('derives commute time from distance and mode speed', () => {
@@ -113,7 +133,21 @@ describe('emissions', () => {
     assert.equal(bus.co2, MODES.bus.co2 * 10 * 2);
   });
   it('treats walking and cycling as zero-emission', () => {
-    const e = planEmissions({ activities: [{ id: 'w', label: 'W', memberIds: ['a'], start: 8, hours: 0.2, kind: 'commute', intensity: 'light', mode: 'walk', distanceKm: 1 }] });
+    const e = planEmissions({
+      activities: [
+        {
+          id: 'w',
+          label: 'W',
+          memberIds: ['a'],
+          start: 8,
+          hours: 0.2,
+          kind: 'commute',
+          intensity: 'light',
+          mode: 'walk',
+          distanceKm: 1,
+        },
+      ],
+    });
     assert.equal(e.co2, 0);
     assert.equal(e.pm, 0);
   });
@@ -124,7 +158,9 @@ describe('scenarios', () => {
     const p = samplePlan();
     const before = p.activities.find((a) => a.id === 'school-run');
     const end = before.start + activityHours(before);
-    const after = applyChange(p, { activityId: 'school-run', mode: 'metro' }).activities.find((a) => a.id === 'school-run');
+    const after = applyChange(p, { activityId: 'school-run', mode: 'metro' }).activities.find(
+      (a) => a.id === 'school-run',
+    );
     assert.ok(Math.abs(after.start + activityHours(after) - end) < 0.01);
     assert.equal(p.activities.find((a) => a.id === 'school-run').mode, 'two-wheeler', 'original plan is untouched');
   });
@@ -136,7 +172,10 @@ describe('scenarios', () => {
     assert.match(checkChange(p, { activityId: 'cricket', mode: 'metro' }).join(), /not a trip/);
     assert.match(checkChange(p, { activityId: 'nope', start: 10 }).join(), /not in your plan/);
     assert.match(checkChange(p, { activityId: 'cricket', start: 17 }).join(), /already/);
-    assert.match(checkChange({ ...p, home: { ...p.home, metro: false } }, { activityId: 'school-run', mode: 'metro' }).join(), /no metro/);
+    assert.match(
+      checkChange({ ...p, home: { ...p.home, metro: false } }, { activityId: 'school-run', mode: 'metro' }).join(),
+      /no metro/,
+    );
     assert.match(checkChange(p, { activityId: 'walk', start: 23 }).join(), /sleeping|midnight/);
   });
 
@@ -167,7 +206,10 @@ describe('optimiser', () => {
     const p = samplePlan();
     const { plan, applied } = optimizeDay(p, SAMPLE_FORECAST);
     assert.ok(applied.length >= 3);
-    assert.ok(applied.every((s) => !s.costly), 'purifier purchase is left to the family');
+    assert.ok(
+      applied.every((s) => !s.costly),
+      'purifier purchase is left to the family',
+    );
     assert.ok(computeDay(plan, SAMPLE_FORECAST).total < computeDay(p, SAMPLE_FORECAST).total * 0.8);
     assert.ok(computeDay(plan, SAMPLE_FORECAST).emissions.co2 < computeDay(p, SAMPLE_FORECAST).emissions.co2);
   });
@@ -185,12 +227,18 @@ describe('timeline', () => {
   it('shows what each person mostly does each hour', async () => {
     const { memberTimeline } = await import('../src/engine/index.js');
     const p = samplePlan();
-    const aarav = memberTimeline(p, p.members.find((m) => m.id === 'aarav'));
+    const aarav = memberTimeline(
+      p,
+      p.members.find((m) => m.id === 'aarav'),
+    );
     assert.equal(aarav.length, 24);
     assert.equal(aarav[2].kind, 'sleep');
     assert.equal(aarav[10].kind, 'indoor-away');
     assert.equal(aarav[17].kind, 'outdoor');
-    const dadi = memberTimeline(p, p.members.find((m) => m.id === 'dadi'));
+    const dadi = memberTimeline(
+      p,
+      p.members.find((m) => m.id === 'dadi'),
+    );
     assert.equal(dadi[19].smoke, true, 'cooking without exhaust');
   });
 });

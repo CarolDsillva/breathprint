@@ -52,7 +52,8 @@ export function checkChange(plan, change) {
     else if (!MODES[change.mode]) errors.push('Unknown transport mode.');
     else {
       const mode = MODES[change.mode];
-      if ((a.distanceKm ?? 0) > mode.maxKm) errors.push(`${a.distanceKm} km is too far to ${mode.label.toLowerCase()}.`);
+      if ((a.distanceKm ?? 0) > mode.maxKm)
+        errors.push(`${a.distanceKm} km is too far to ${mode.label.toLowerCase()}.`);
       if (change.mode === 'metro' && !plan.home.metro) errors.push('You told us there is no metro near you.');
       if (change.mode === 'bus' && !plan.home.bus) errors.push('You told us there is no bus near you.');
     }
@@ -71,7 +72,9 @@ export function checkChange(plan, change) {
   const hours = activityHours(moved);
   if (moved.start < 0 || moved.start + hours > 24) return ['The new time runs past midnight.'];
   const others = plan.activities.filter((o) => o.id !== a.id && o.memberIds.some((id) => moved.memberIds.includes(id)));
-  const clash = others.find((o) => overlaps({ start: moved.start, hours }, { start: o.start, hours: activityHours(o) }));
+  const clash = others.find((o) =>
+    overlaps({ start: moved.start, hours }, { start: o.start, hours: activityHours(o) }),
+  );
   if (clash) errors.push(`It would clash with "${clash.label}" at ${formatTime(clash.start)}.`);
   if (typeof change.start === 'number' && moved.kind !== 'home') {
     const sleep = plan.sleep ?? DEFAULT_SLEEP;
@@ -90,20 +93,35 @@ export function checkChange(plan, change) {
 export function describeChange(plan, change) {
   const a = change.activityId ? plan.activities.find((x) => x.id === change.activityId) : undefined;
   const parts = [];
-  if (a && change.mode) parts.push(`Go by ${MODES[change.mode].label} instead of ${MODES[a.mode ?? "bus"].label} for "${a.label}"`);
-  if (a && typeof change.start === 'number') parts.push(`Move "${a.label}" from ${formatTime(a.start)} to ${formatTime(change.start)}`);
+  if (a && change.mode)
+    parts.push(`Go by ${MODES[change.mode].label} instead of ${MODES[a.mode ?? 'bus'].label} for "${a.label}"`);
+  if (a && typeof change.start === 'number')
+    parts.push(`Move "${a.label}" from ${formatTime(a.start)} to ${formatTime(change.start)}`);
   if (a && change.source) parts.push(`"${a.label}": ${SOURCES[change.source].label.toLowerCase()}`);
-  if (change.windows) parts.push(change.windows === 'closed' ? 'Keep windows shut at home' : 'Open the windows at home');
+  if (change.windows)
+    parts.push(change.windows === 'closed' ? 'Keep windows shut at home' : 'Open the windows at home');
   if (change.purifier === true) parts.push('Run an air purifier at home');
   if (change.purifier === false) parts.push('Turn off the air purifier');
   return parts.join('; ');
 }
 
 /**
+ * @typedef {{ memberId: string, name: string, before: number, after: number, pct: number }} MemberDelta
+ * @typedef {{ dosePct: number, weightedPct: number, co2: number, pm: number }} Delta
+ * @typedef {{
+ *   ok: true, errors: string[], description: string, plan: import('./dose.js').Plan,
+ *   before: ReturnType<typeof computeDay>, after: ReturnType<typeof computeDay>,
+ *   delta: Delta, perMember: MemberDelta[]
+ * }} Comparison a feasible change, with its effect on every family member
+ * @typedef {{ ok: false, errors: string[] }} Rejection a change that cannot be made, with reasons
+ */
+
+/**
  * Compare the plan before and after a change.
  * @param {import('./dose.js').Plan} plan
  * @param {import('./dose.js').Forecast} pm
  * @param {Change} change
+ * @returns {Comparison | Rejection}
  */
 export function compareChange(plan, pm, change) {
   const errors = checkChange(plan, change);

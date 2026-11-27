@@ -3,7 +3,7 @@
  * Tiny element builder. Text is always set with textContent, never parsed as HTML,
  * so user input and AI text cannot inject markup.
  * @param {string} tag
- * @param {Record<string, any> | null} [attrs]
+ * @param {Record<string, unknown> | null} [attrs]
  * @param {...(Node | string | number | null | undefined | false)} children
  * @returns {HTMLElement}
  */
@@ -11,11 +11,12 @@ export function h(tag, attrs, ...children) {
   const el = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs ?? {})) {
     if (value === undefined || value === null || value === false) continue;
-    if (key === 'class') el.className = value;
+    if (key === 'class') el.className = String(value);
     // Via the CSSOM: allowed under our strict Content-Security-Policy, unlike style="" attributes.
-    else if (key === 'style') el.style.cssText = value;
+    else if (key === 'style') el.style.cssText = String(value);
     else if (key === 'dataset') Object.assign(el.dataset, value);
-    else if (key in el && typeof value !== 'string') /** @type {any} */ (el)[key] = value;
+    // Properties such as `checked`, `disabled` and `onclick` are set directly, not as attributes.
+    else if (key in el && typeof value !== 'string') Reflect.set(el, key, value);
     else el.setAttribute(key, value === true ? '' : String(value));
   }
   for (const child of children) {

@@ -12,6 +12,13 @@ export const FALLBACK_MODEL = 'gemini-flash-latest';
  */
 const MIN_OUTPUT_TOKENS = 2048;
 
+/**
+ * The parts of a generateContent response we read. Untrusted: every field is optional.
+ * @typedef {{ text?: unknown, thought?: unknown }} ResponsePart
+ * @typedef {{ content?: { parts?: ResponsePart[] }, finishReason?: unknown }} Candidate
+ * @typedef {{ candidates?: Candidate[], promptFeedback?: { blockReason?: unknown } }} GenerateResponse
+ */
+
 /** A Gemini failure with a short, non-sensitive reason code (e.g. "http-429", "truncated"). */
 export class GeminiError extends Error {
   /** @param {string} code */
@@ -27,7 +34,13 @@ export class GeminiError extends Error {
  * the key or any user data) is kept for the health check and the logs.
  * @param {{ apiKey?: string, model?: string, fallbackModel?: string, fetchImpl?: typeof fetch, logger?: Pick<Console, 'warn'> }} opts
  */
-export function createGemini({ apiKey, model = DEFAULT_MODEL, fallbackModel = FALLBACK_MODEL, fetchImpl = fetch, logger }) {
+export function createGemini({
+  apiKey,
+  model = DEFAULT_MODEL,
+  fallbackModel = FALLBACK_MODEL,
+  fetchImpl = fetch,
+  logger,
+}) {
   const enabled = Boolean(apiKey);
   const state = { lastError: /** @type {string | null} */ (null) };
 
@@ -68,9 +81,15 @@ export function createGemini({ apiKey, model = DEFAULT_MODEL, fallbackModel = FA
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: prompt }, ...(image ? [{ inlineData: image }] : [])] }],
       };
-      const generationConfig = { responseMimeType: 'application/json', maxOutputTokens: Math.max(maxTokens, MIN_OUTPUT_TOKENS) };
+      const generationConfig = {
+        responseMimeType: 'application/json',
+        maxOutputTokens: Math.max(maxTokens, MIN_OUTPUT_TOKENS),
+      };
       try {
-        const withThinking = { ...base, generationConfig: { ...generationConfig, thinkingConfig: { thinkingLevel: 'low' } } };
+        const withThinking = {
+          ...base,
+          generationConfig: { ...generationConfig, thinkingConfig: { thinkingLevel: 'low' } },
+        };
         let res = await call(withThinking);
         // Model name not available for this key: switch to the backup model for good.
         if (res.status === 404 && activeModel !== fallbackModel) {
@@ -81,10 +100,13 @@ export function createGemini({ apiKey, model = DEFAULT_MODEL, fallbackModel = FA
         // Older models reject thinkingConfig: retry once without it.
         if (res.status === 400) res = await call({ ...base, generationConfig });
         if (!res.ok) throw new GeminiError(`http-${res.status}`);
-        const body = /** @type {any} */ (await res.json());
+        const body = /** @type {GenerateResponse | null} */ (await res.json());
         const candidate = body?.candidates?.[0];
         if (!candidate) throw new GeminiError(body?.promptFeedback?.blockReason ? 'blocked' : 'no-candidate');
-        const text = (candidate.content?.parts ?? []).filter((/** @type {any} */ p) => !p?.thought).map((/** @type {any} */ p) => p?.text ?? '').join('');
+        const text = (candidate.content?.parts ?? [])
+          .filter((part) => !part?.thought)
+          .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+          .join('');
         if (candidate.finishReason === 'MAX_TOKENS') throw new GeminiError('truncated');
         let parsed;
         try {
@@ -95,7 +117,12 @@ export function createGemini({ apiKey, model = DEFAULT_MODEL, fallbackModel = FA
         state.lastError = null;
         return parsed;
       } catch (err) {
-        const code = err instanceof GeminiError ? err.code : /** @type {any} */ (err)?.name === 'TimeoutError' ? 'timeout' : 'network';
+        const code =
+          err instanceof GeminiError
+            ? err.code
+            : err instanceof Error && err.name === 'TimeoutError'
+              ? 'timeout'
+              : 'network';
         state.lastError = code;
         logger?.warn(`[gemini] ${code}`);
         throw err instanceof GeminiError ? err : new GeminiError(code);
@@ -106,5 +133,8 @@ export function createGemini({ apiKey, model = DEFAULT_MODEL, fallbackModel = FA
 
 /** @param {string} s */
 function stripFences(s) {
-  return s.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '');
+  return s
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/```$/, '');
 }

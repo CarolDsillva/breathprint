@@ -14,7 +14,11 @@ const axeSource = await readFile(require.resolve('axe-core/axe.min.js'), 'utf8')
 async function audit() {
   const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
   // axe probes <canvas>, which jsdom does not implement; that warning is noise here.
-  const dom = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: new VirtualConsole() });
+  const dom = new JSDOM(html, {
+    runScripts: 'outside-only',
+    pretendToBeVisual: true,
+    virtualConsole: new VirtualConsole(),
+  });
   dom.window.eval(axeSource);
   return dom.window.axe.run(dom.window.document, {
     runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] },
@@ -34,7 +38,10 @@ describe('accessibility (axe-core)', () => {
     const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
     const { document } = new JSDOM(html).window;
     for (const el of document.querySelectorAll('input, select, textarea')) {
-      const labelled = el.closest('label') || (el.id && document.querySelector(`label[for="${el.id}"]`)) || el.getAttribute('aria-label');
+      const labelled =
+        el.closest('label') ||
+        (el.id && document.querySelector(`label[for="${el.id}"]`)) ||
+        el.getAttribute('aria-label');
       assert.ok(labelled, `unlabelled control: ${el.outerHTML.slice(0, 80)}`);
     }
     assert.ok(document.querySelector('main#main'));

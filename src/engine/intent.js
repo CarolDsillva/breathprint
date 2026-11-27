@@ -28,7 +28,8 @@ const PART_OF_DAY = /** @type {const} */ ([
  * @param {string} text lower-case
  */
 export function parseTime(text) {
-  const m = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)/) ?? text.match(/\bat (\d{1,2})(?::(\d{2}))?\b/);
+  const m =
+    text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)/) ?? text.match(/\bat (\d{1,2})(?::(\d{2}))?\b/);
   if (m) {
     let h = Number(m[1]);
     const min = m[2] ? Number(m[2]) : 0;
@@ -56,7 +57,9 @@ export function matchActivity(text, plan) {
   let bestScore = 0;
   for (const a of plan.activities) {
     const names = plan.members.filter((m) => a.memberIds.includes(m.id)).map((m) => m.name.toLowerCase());
-    const tokens = [...a.label.toLowerCase().split(/[^a-z0-9\p{Script=Devanagari}]+/u), ...names].filter((w) => w.length > 2);
+    const tokens = [...a.label.toLowerCase().split(/[^a-z0-9\p{Script=Devanagari}]+/u), ...names].filter(
+      (w) => w.length > 2,
+    );
     let s = 0;
     for (const t of tokens) if (words.has(t)) s += names.includes(t) ? 1 : 2;
     if (a.kind === 'commute' && /\b(commute|trip|ride|go to|travel)\b/.test(text)) s += 1;

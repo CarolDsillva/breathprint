@@ -24,10 +24,26 @@ export const INTENSITIES = /** @type {const} */ (['sleep', 'rest', 'light', 'mod
  * `weight` raises the priority of more vulnerable people when the optimiser ranks choices.
  */
 export const AGE_GROUPS = Object.freeze({
-  child: { label: 'Child (5–11)', weight: 1.5, rates: { sleep: 0.27, rest: 0.29, light: 0.66, moderate: 1.32, vigorous: 2.5 } },
-  teen: { label: 'Teen (12–17)', weight: 1.2, rates: { sleep: 0.29, rest: 0.3, light: 0.74, moderate: 1.6, vigorous: 2.9 } },
-  adult: { label: 'Adult (18–64)', weight: 1, rates: { sleep: 0.3, rest: 0.31, light: 0.72, moderate: 1.6, vigorous: 3.0 } },
-  senior: { label: 'Senior (65+)', weight: 1.3, rates: { sleep: 0.3, rest: 0.29, light: 0.72, moderate: 1.5, vigorous: 2.8 } },
+  child: {
+    label: 'Child (5–11)',
+    weight: 1.5,
+    rates: { sleep: 0.27, rest: 0.29, light: 0.66, moderate: 1.32, vigorous: 2.5 },
+  },
+  teen: {
+    label: 'Teen (12–17)',
+    weight: 1.2,
+    rates: { sleep: 0.29, rest: 0.3, light: 0.74, moderate: 1.6, vigorous: 2.9 },
+  },
+  adult: {
+    label: 'Adult (18–64)',
+    weight: 1,
+    rates: { sleep: 0.3, rest: 0.31, light: 0.72, moderate: 1.6, vigorous: 3.0 },
+  },
+  senior: {
+    label: 'Senior (65+)',
+    weight: 1.3,
+    rates: { sleep: 0.3, rest: 0.29, light: 0.72, moderate: 1.5, vigorous: 2.8 },
+  },
 });
 
 /** Extra priority for someone with asthma, heart or lung conditions, or pregnancy. */
@@ -56,9 +72,36 @@ export const PLACE_RATIO = Object.freeze({
 export const MODES = Object.freeze({
   walk: { label: 'Walk', ratio: 1.3, intensity: 'light', speed: 5, co2: 0, pm: 0, perVehicle: false, maxKm: 2.5 },
   cycle: { label: 'Cycle', ratio: 1.3, intensity: 'moderate', speed: 14, co2: 0, pm: 0, perVehicle: false, maxKm: 8 },
-  'two-wheeler': { label: 'Two-wheeler', ratio: 1.5, intensity: 'rest', speed: 25, co2: 45, pm: 15, perVehicle: true, maxKm: 60 },
-  auto: { label: 'Auto-rickshaw (CNG)', ratio: 1.4, intensity: 'rest', speed: 20, co2: 60, pm: 8, perVehicle: true, maxKm: 30 },
-  car: { label: 'Car (windows up, recirculate)', ratio: 0.6, intensity: 'rest', speed: 22, co2: 140, pm: 10, perVehicle: true, maxKm: 200 },
+  'two-wheeler': {
+    label: 'Two-wheeler',
+    ratio: 1.5,
+    intensity: 'rest',
+    speed: 25,
+    co2: 45,
+    pm: 15,
+    perVehicle: true,
+    maxKm: 60,
+  },
+  auto: {
+    label: 'Auto-rickshaw (CNG)',
+    ratio: 1.4,
+    intensity: 'rest',
+    speed: 20,
+    co2: 60,
+    pm: 8,
+    perVehicle: true,
+    maxKm: 30,
+  },
+  car: {
+    label: 'Car (windows up, recirculate)',
+    ratio: 0.6,
+    intensity: 'rest',
+    speed: 22,
+    co2: 140,
+    pm: 10,
+    perVehicle: true,
+    maxKm: 200,
+  },
   bus: { label: 'Bus', ratio: 1.1, intensity: 'rest', speed: 18, co2: 25, pm: 5, perVehicle: false, maxKm: 60 },
   metro: { label: 'Metro', ratio: 0.6, intensity: 'rest', speed: 32, co2: 15, pm: 0.5, perVehicle: false, maxKm: 80 },
 });

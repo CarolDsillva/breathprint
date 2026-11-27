@@ -31,7 +31,7 @@ const SOURCE_SWAPS = /** @type {const} */ ({
  * @param {ReturnType<typeof compareChange>} r
  */
 function score(r) {
-  if (!r.ok || !r.delta || !r.before) return -Infinity;
+  if (!r.ok) return -Infinity;
   const emitPct = r.before.emissions.co2 > 0 ? (-r.delta.co2 / r.before.emissions.co2) * 100 : 0;
   return -r.delta.weightedPct + 0.25 * emitPct;
 }
@@ -40,13 +40,13 @@ function score(r) {
  * Turn a comparison into a suggestion.
  * @param {Suggestion['type']} type
  * @param {Change} change
- * @param {Exclude<ReturnType<typeof compareChange>, { ok: false }>} r
+ * @param {import('./scenario.js').Comparison} r
  * @param {string} why
  * @param {boolean} [costly]
  * @returns {Suggestion}
  */
 function toSuggestion(type, change, r, why, costly = false) {
-  const d = /** @type {NonNullable<typeof r.delta>} */ (r.delta);
+  const d = r.delta;
   return {
     id: `${type}:${change.activityId ?? 'home'}`,
     type,
@@ -94,7 +94,7 @@ function bestMode(plan, pm, a) {
     /** @type {Change} */
     const change = { activityId: a.id, mode };
     const r = compareChange(plan, pm, change);
-    if (!r.ok || !r.delta) continue;
+    if (!r.ok) continue;
     if (r.delta.weightedPct > MAX_DOSE_PENALTY_PCT) continue;
     if (!best || score(r) > score(best.r)) best = { change, r };
   }
@@ -106,8 +106,10 @@ function bestMode(plan, pm, a) {
  * @param {keyof typeof MODES | undefined} mode
  */
 export function modeWhy(mode) {
-  if (mode === 'walk' || mode === 'cycle') return 'No exhaust at all, and on a short trip you spend little time next to traffic.';
-  if (mode === 'metro' || mode === 'bus') return 'Shared transport puts fewer exhaust pipes on the street, and a closed coach keeps road smoke out.';
+  if (mode === 'walk' || mode === 'cycle')
+    return 'No exhaust at all, and on a short trip you spend little time next to traffic.';
+  if (mode === 'metro' || mode === 'bus')
+    return 'Shared transport puts fewer exhaust pipes on the street, and a closed coach keeps road smoke out.';
   return 'A closed cabin on recirculation keeps most road smoke out.';
 }
 
@@ -128,12 +130,16 @@ export function suggest(plan, pm) {
    */
   const push = (type, found, why, costly) => {
     if (!found || !found.r.ok || score(found.r) < MIN_GAIN_PCT) return;
-    out.push(toSuggestion(type, found.change, /** @type {any} */ (found.r), why, costly));
+    out.push(toSuggestion(type, found.change, found.r, why, costly));
   };
 
   for (const a of plan.activities) {
     if (a.flexible && a.kind !== 'commute') {
-      push('shift', bestShift(plan, pm, a), 'The air is cleaner at that hour, so the same activity costs your lungs less.');
+      push(
+        'shift',
+        bestShift(plan, pm, a),
+        'The air is cleaner at that hour, so the same activity costs your lungs less.',
+      );
     }
     if (a.kind === 'commute' && a.mode) {
       const found = bestMode(plan, pm, a);
@@ -141,16 +147,29 @@ export function suggest(plan, pm) {
     }
     if (a.kind === 'home' && a.source && a.source in SOURCE_SWAPS) {
       const change = { activityId: a.id, source: SOURCE_SWAPS[/** @type {keyof typeof SOURCE_SWAPS} */ (a.source)] };
-      push('source', { change, r: compareChange(plan, pm, change) }, 'Indoor smoke adds to what already leaks in from outside.');
+      push(
+        'source',
+        { change, r: compareChange(plan, pm, change) },
+        'Indoor smoke adds to what already leaks in from outside.',
+      );
     }
   }
   if (plan.home.windows === 'open' && !plan.home.purifier) {
     const change = /** @type {Change} */ ({ windows: 'closed' });
-    push('windows', { change, r: compareChange(plan, pm, change) }, 'Closed windows roughly halve the smog that drifts indoors on bad days.');
+    push(
+      'windows',
+      { change, r: compareChange(plan, pm, change) },
+      'Closed windows roughly halve the smog that drifts indoors on bad days.',
+    );
   }
   if (!plan.home.purifier) {
     const change = { purifier: true };
-    push('purifier', { change, r: compareChange(plan, pm, change) }, 'A HEPA purifier (or a DIY box-fan filter) scrubs the air where your family spends most hours.', true);
+    push(
+      'purifier',
+      { change, r: compareChange(plan, pm, change) },
+      'A HEPA purifier (or a DIY box-fan filter) scrubs the air where your family spends most hours.',
+      true,
+    );
   }
   // Largest drop in weighted family dose first; ties go to the bigger emissions cut.
   return out.sort((x, y) => x.impact.weightedPct - y.impact.weightedPct || x.impact.co2 - y.impact.co2);
@@ -173,7 +192,7 @@ export function optimizeDay(plan, pm, opts = {}) {
     const next = suggest(current, pm).find((s) => !used.has(s.id) && (includeCostly || !s.costly));
     if (!next) break;
     const r = compareChange(current, pm, next.change);
-    if (!r.ok || !r.plan) break;
+    if (!r.ok) break;
     used.add(next.id);
     applied.push(next);
     current = r.plan;

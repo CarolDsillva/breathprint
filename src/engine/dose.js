@@ -45,12 +45,13 @@ export function homeRatio(home) {
  * Where a person is during an activity: PM2.5 ratio to outdoor, extra indoor PM2.5, and effort.
  * @param {Activity} a
  * @param {Home} home
+ * @returns {{ ratio: number, add: number, intensity: Activity['intensity'] }}
  */
 export function activityEnvironment(a, home) {
   switch (a.kind) {
     case 'commute': {
       const mode = MODES[a.mode ?? 'bus'];
-      return { ratio: mode.ratio, add: 0, intensity: mode.intensity };
+      return { ratio: mode.ratio, add: 0, intensity: /** @type {Activity['intensity']} */ (mode.intensity) };
     }
     case 'outdoor':
       return { ratio: a.nearTraffic ? PLACE_RATIO.roadside : PLACE_RATIO.outdoor, add: 0, intensity: a.intensity };
@@ -163,14 +164,21 @@ export function memberTimeline(plan, member) {
   const sleep = plan.sleep ?? DEFAULT_SLEEP;
   const best = Array.from({ length: 24 }, (_, hour) => ({
     share: 0,
-    slot: { kind: /** @type {Activity['kind'] | 'sleep'} */ (isSleepHour(hour, sleep) ? 'sleep' : 'home'), label: isSleepHour(hour, sleep) ? 'Asleep' : 'At home', smoke: false },
+    slot: {
+      kind: /** @type {Activity['kind'] | 'sleep'} */ (isSleepHour(hour, sleep) ? 'sleep' : 'home'),
+      label: isSleepHour(hour, sleep) ? 'Asleep' : 'At home',
+      smoke: false,
+    },
   }));
   for (const a of plan.activities) {
     if (!a.memberIds.includes(member.id)) continue;
     for (const { hour, fraction } of segments(a.start, activityHours(a))) {
       // An activity shows in an hour once it fills a fifth of it, so short trips stay visible.
       if (fraction >= 0.2 && fraction > best[hour].share) {
-        best[hour] = { share: fraction, slot: { kind: a.kind, label: a.label, smoke: a.kind === 'home' && (a.source ?? 'none') !== 'none' } };
+        best[hour] = {
+          share: fraction,
+          slot: { kind: a.kind, label: a.label, smoke: a.kind === 'home' && (a.source ?? 'none') !== 'none' },
+        };
       }
     }
   }

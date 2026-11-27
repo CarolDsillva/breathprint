@@ -1,6 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { isForecast, parseWhatIf, purifierPlan, sanitizeChange, samplePlan, validatePlan } from '../src/engine/index.js';
+import {
+  isForecast,
+  parseWhatIf,
+  purifierPlan,
+  sanitizeChange,
+  samplePlan,
+  validatePlan,
+} from '../src/engine/index.js';
 import { parseTime } from '../src/engine/intent.js';
 import { cleanText } from '../src/engine/validate.js';
 
@@ -69,7 +76,10 @@ describe('isForecast', () => {
 describe('sanitizeChange', () => {
   it('keeps only known activities, modes and sources', () => {
     const p = samplePlan();
-    assert.deepEqual(sanitizeChange({ activityId: 'school-run', mode: 'metro', extra: 1 }, p), { activityId: 'school-run', mode: 'metro' });
+    assert.deepEqual(sanitizeChange({ activityId: 'school-run', mode: 'metro', extra: 1 }, p), {
+      activityId: 'school-run',
+      mode: 'metro',
+    });
     assert.equal(sanitizeChange({ activityId: 'nope', mode: 'metro' }, p), null);
     assert.equal(sanitizeChange({ activityId: 'school-run', mode: 'teleport' }, p), null);
     assert.deepEqual(sanitizeChange({ windows: 'closed' }, p), { windows: 'closed' });
@@ -87,9 +97,15 @@ describe('offline what-if parser', () => {
     assert.equal(parseTime('no time here'), null);
   });
   it('maps questions to changes', () => {
-    assert.deepEqual(parseWhatIf('What if Aarav plays cricket at 2pm?', plan).change, { activityId: 'cricket', start: 14 });
+    assert.deepEqual(parseWhatIf('What if Aarav plays cricket at 2pm?', plan).change, {
+      activityId: 'cricket',
+      start: 14,
+    });
     assert.deepEqual(parseWhatIf('School run by metro?', plan).change, { activityId: 'school-run', mode: 'metro' });
-    assert.deepEqual(parseWhatIf('use the chimney while cooking dinner', plan).change, { activityId: 'cooking', source: 'gas-cooking-exhaust' });
+    assert.deepEqual(parseWhatIf('use the chimney while cooking dinner', plan).change, {
+      activityId: 'cooking',
+      source: 'gas-cooking-exhaust',
+    });
     assert.deepEqual(parseWhatIf('what if we keep the windows shut', plan).change, { windows: 'closed' });
     assert.deepEqual(parseWhatIf('buy a purifier', plan).change, { purifier: true });
   });
