@@ -43,10 +43,6 @@ export class TtlCache {
       this.map.delete(oldest);
     }
   }
-
-  get size() {
-    return this.map.size;
-  }
 }
 
 /**

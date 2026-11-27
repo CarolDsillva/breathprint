@@ -120,11 +120,8 @@ function fixCard(fix, plan, seen) {
 function showFixes(ids, evidence = {}) {
   const checked = validatePlan(state.plan);
   if (!checked.ok) return say('Fix your family plan above first.', true);
+  // Callers pass at least one known finding, so there is always at least one fix.
   const fixes = findingsToFixes(ids, checked.plan);
-  if (!fixes.length) {
-    ui.out.replaceChildren(h('p', { class: 'hint' }, 'Nothing to fix was found. Nice work keeping indoor air clean.'));
-    return;
-  }
   ui.out.replaceChildren(h('ul', { class: 'fixes' }, ...fixes.map((f) => fixCard(f, checked.plan, evidence[f.id]))));
 }
 

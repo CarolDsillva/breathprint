@@ -43,8 +43,11 @@ function emit(kind) {
   for (const listener of listeners) listener(kind);
 }
 
-/** @returns {Plan} */
-function loadPlan() {
+/**
+ * The plan saved in this browser, or the sample family if there is none or it is invalid.
+ * @returns {Plan}
+ */
+export function loadPlan() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
     const checked = validatePlan(saved);

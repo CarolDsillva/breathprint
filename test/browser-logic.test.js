@@ -208,3 +208,66 @@ describe('API client', () => {
     await assert.rejects(api.scanPhoto('abc', 'image/jpeg'), /Could not reach the server/);
   });
 });
+
+describe('rendering edge cases', () => {
+  it('shows gaps in the forecast strip and explains empty impact', async () => {
+    const { renderAirStrip } = await import('../public/js/forecast-panel.js');
+    const view = await import('../public/js/budget-view.js');
+    const engine = await import('../src/engine/index.js');
+    const strip = document.createElement('ol');
+    renderAirStrip(strip, [null, ...SAMPLE_FORECAST.slice(1)]);
+    assert.equal(strip.firstElementChild.getAttribute('aria-label'), '12 AM: no data');
+
+    const day = engine.computeDay(samplePlan(), SAMPLE_FORECAST);
+    const el = document.createElement('div');
+    view.renderSeason(el, samplePlan(), engine.seasonSavings(day, day, 0));
+    assert.match(el.textContent, /smog season .* is over/);
+    view.renderSeason(el, samplePlan(), engine.seasonSavings(day, day, 30));
+    assert.match(el.textContent, /already close to the cleanest/);
+    view.renderRipple(el, engine.communityRipple(day, day, 100));
+    assert.match(el.textContent, /nothing to multiply yet/);
+    view.renderSuggestions(el, [], () => {});
+    assert.match(el.textContent, /already well planned/);
+  });
+
+  it('edits effort, transport and smoke source with valid values only', () => {
+    const plan = samplePlan();
+    const cooking = plan.activities.find((a) => a.id === 'cooking');
+    const trip = plan.activities.find((a) => a.id === 'school-run');
+    setActivityField(cooking, 'intensity', control({ value: 'moderate' }));
+    setActivityField(cooking, 'source', control({ value: 'gas-cooking-exhaust' }));
+    setActivityField(trip, 'mode', control({ value: 'metro' }));
+    setActivityField(trip, 'distanceKm', control({ value: '7' }));
+    setActivityField(trip, 'mode', control({ value: 'hoverboard' }));
+    assert.deepEqual(
+      [cooking.intensity, cooking.source, trip.mode, trip.distanceKm],
+      ['moderate', 'gas-cooking-exhaust', 'metro', 7],
+    );
+  });
+});
+
+describe('storage problems', () => {
+  afterEach(() => mock.restoreAll());
+
+  it('keeps working when the browser cannot save', () => {
+    mock.method(dom.window.Storage.prototype, 'setItem', () => {
+      throw new Error('QuotaExceededError');
+    });
+    assert.doesNotThrow(() => state.planEdited());
+    assert.equal(dom.window.Storage.prototype.setItem.mock.callCount(), 1, 'the save was attempted');
+  });
+
+  it('starts from the sample family when the saved plan is missing or corrupt', () => {
+    localStorage.removeItem('breathprint:plan:v1');
+    assert.deepEqual(state.loadPlan(), samplePlan());
+    localStorage.setItem('breathprint:plan:v1', '{not json');
+    assert.deepEqual(state.loadPlan(), samplePlan());
+  });
+
+  it('restores a valid saved plan', () => {
+    const saved = samplePlan();
+    saved.members[0].name = 'From storage';
+    localStorage.setItem('breathprint:plan:v1', JSON.stringify(saved));
+    assert.equal(state.loadPlan().members[0].name, 'From storage');
+  });
+});

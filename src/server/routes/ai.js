@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * AI routes: family briefing, what-if questions and room-photo scans. Each has its own body
- * limit: 32 KB for plans and questions, 1.6 MB only for photos.
+ * limit: 32 KB for plans and questions, 1.6 MB only for photos. Express 5 passes errors from
+ * these async handlers to the app's error handler, so they need no try/catch of their own.
  */
 import { createHash } from 'node:crypto';
 import express, { Router } from 'express';
@@ -50,7 +51,7 @@ export function aiRoutes({ gemini, limiter }) {
   // Same plan + same air + same language → reuse the last briefing for 10 minutes.
   const briefingCache = new TtlCache({ ttlMs: BRIEFING_CACHE_MS, max: 300 });
 
-  router.post('/coach', limiter, SMALL_BODY, async (req, res, next) => {
+  router.post('/coach', limiter, SMALL_BODY, async (req, res) => {
     const body = fields(req.body);
     const input = parsePlanAndForecast(body);
     if ('error' in input) return res.status(400).json(input);
@@ -61,34 +62,26 @@ export function aiRoutes({ gemini, limiter }) {
     const key = createHash('sha256')
       .update(JSON.stringify([input.plan, input.forecast, language]))
       .digest('hex');
-    try {
-      let result = briefingCache.get(key);
-      if (!result) {
-        result = await writeBriefing(gemini, input.plan, input.forecast, language);
-        briefingCache.set(key, result);
-      }
-      res.json(result);
-    } catch (err) {
-      next(err);
+    let result = briefingCache.get(key);
+    if (!result) {
+      result = await writeBriefing(gemini, input.plan, input.forecast, language);
+      briefingCache.set(key, result);
     }
+    res.json(result);
   });
 
-  router.post('/whatif', limiter, SMALL_BODY, async (req, res, next) => {
+  router.post('/whatif', limiter, SMALL_BODY, async (req, res) => {
     const body = fields(req.body);
     const checked = validatePlan(body.plan);
     if (!checked.ok) return res.status(400).json({ error: 'Invalid plan.', details: checked.errors.slice(0, 5) });
     const question = cleanText(body.question, 200);
     if (question.length < 3)
       return res.status(400).json({ error: 'Ask a question, e.g. "What if we take the metro?"' });
-    try {
-      res.json(await interpretWhatIf(gemini, checked.plan, question));
-    } catch (err) {
-      next(err);
-    }
+    res.json(await interpretWhatIf(gemini, checked.plan, question));
   });
 
   // Photos are checked, sent to Gemini and never stored or logged.
-  router.post('/scan', limiter, PHOTO_BODY, async (req, res, next) => {
+  router.post('/scan', limiter, PHOTO_BODY, async (req, res) => {
     if (!gemini.enabled) {
       return res
         .status(503)
@@ -97,13 +90,9 @@ export function aiRoutes({ gemini, limiter }) {
     const body = fields(req.body);
     const image = decodeImage(body.image, body.mimeType);
     if ('error' in image) return res.status(400).json({ error: image.error });
-    try {
-      const result = await scanRoom(gemini, image);
-      if (!result) return res.status(502).json({ error: 'Could not read that photo. Try another angle.' });
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
+    const result = await scanRoom(gemini, image);
+    if (!result) return res.status(502).json({ error: 'Could not read that photo. Try another angle.' });
+    res.json(result);
   });
 
   return router;

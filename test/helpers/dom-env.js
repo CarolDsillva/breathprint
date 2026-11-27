@@ -21,6 +21,7 @@ Object.assign(globalThis, {
   localStorage: dom.window.localStorage,
   Node: dom.window.Node,
   Event: dom.window.Event,
+  FileReader: dom.window.FileReader,
   HTMLElement: dom.window.HTMLElement,
   HTMLInputElement: dom.window.HTMLInputElement,
   HTMLSelectElement: dom.window.HTMLSelectElement,
