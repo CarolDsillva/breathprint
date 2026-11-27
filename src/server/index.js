@@ -12,7 +12,7 @@ const port = Number(process.env.PORT) || 8080;
 
 const app = createApp({
   air: createAirQualityService(),
-  gemini: createGemini({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_MODEL || undefined }),
+  gemini: createGemini({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_MODEL || undefined, logger: console }),
 });
 
 const server = app.listen(port, () => {

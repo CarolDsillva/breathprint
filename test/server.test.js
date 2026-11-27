@@ -236,3 +236,51 @@ describe('server helpers', () => {
     assert.equal(t.tips.length, Math.min(4, facts.suggestions.length));
   });
 });
+
+describe('Gemini client robustness', () => {
+  const ok = (text, extra = {}) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] }, ...extra }] }));
+
+  it('asks for low thinking and enough output room', async () => {
+    let body;
+    const g = createGemini({ apiKey: 'k', fetchImpl: async (_u, init) => { body = JSON.parse(init.body); return ok('{"a":1}'); } });
+    assert.deepEqual(await g.generateJson({ system: 's', prompt: 'p', maxTokens: 200 }), { a: 1 });
+    assert.equal(body.generationConfig.thinkingConfig.thinkingLevel, 'low');
+    assert.ok(body.generationConfig.maxOutputTokens >= 2048);
+    assert.equal(g.lastError, null);
+  });
+
+  it('retries once without thinkingConfig when a model rejects it', async () => {
+    const bodies = [];
+    const g = createGemini({ apiKey: 'k', fetchImpl: async (_u, init) => {
+      bodies.push(JSON.parse(init.body));
+      return bodies.length === 1 ? new Response('{}', { status: 400 }) : ok('{"b":2}');
+    } });
+    assert.deepEqual(await g.generateJson({ system: 's', prompt: 'p' }), { b: 2 });
+    assert.equal(bodies.length, 2);
+    assert.equal(bodies[1].generationConfig.thinkingConfig, undefined);
+  });
+
+  it('ignores thought parts and reports cut-off answers', async () => {
+    const thoughtful = createGemini({ apiKey: 'k', fetchImpl: async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'thinking…', thought: true }, { text: '{"c":3}' }] } }] })) });
+    assert.deepEqual(await thoughtful.generateJson({ system: 's', prompt: 'p' }), { c: 3 });
+
+    const warnings = [];
+    const cut = createGemini({ apiKey: 'k', logger: { warn: (m) => warnings.push(m) }, fetchImpl: async () => ok('{"summary": "half', { finishReason: 'MAX_TOKENS' }) });
+    await assert.rejects(cut.generateJson({ system: 's', prompt: 'p' }), /truncated/);
+    assert.equal(cut.lastError, 'truncated');
+    assert.deepEqual(warnings, ['[gemini] truncated']);
+  });
+
+  it('shows the last failure code in the health check, without secrets', async () => {
+    const gemini = createGemini({ apiKey: 'secret-key', logger: { warn() {} }, fetchImpl: async () => new Response('{}', { status: 429 }) });
+    const ctx = await start({ gemini });
+    try {
+      await post(`${ctx.base}/api/coach`, { plan: samplePlan(), forecast: SAMPLE_FORECAST });
+      const text = await (await fetch(`${ctx.base}/api/health`)).text();
+      assert.deepEqual(JSON.parse(text), { ok: true, ai: 'gemini', aiLastError: 'http-429' });
+      assert.doesNotMatch(text, /secret-key/);
+    } finally {
+      ctx.server.close();
+    }
+  });
+});

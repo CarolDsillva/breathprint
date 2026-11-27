@@ -69,7 +69,8 @@ export function createApp({ air, gemini, rateLimitPerMinute = 120, aiRateLimitPe
   const coachCache = new TtlCache({ ttlMs: 10 * 60_000, max: 300 });
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, ai: gemini.enabled ? 'gemini' : 'offline' });
+    // aiLastError is a short reason code (e.g. "http-429"), never a key or user data.
+    res.json({ ok: true, ai: gemini.enabled ? 'gemini' : 'offline', ...(gemini.lastError ? { aiLastError: gemini.lastError } : {}) });
   });
 
   app.get('/api/places', async (req, res, next) => {
