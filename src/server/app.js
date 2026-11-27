@@ -70,7 +70,12 @@ export function createApp({ air, gemini, rateLimitPerMinute = 120, aiRateLimitPe
 
   app.get('/api/health', (_req, res) => {
     // aiLastError is a short reason code (e.g. "http-429"), never a key or user data.
-    res.json({ ok: true, ai: gemini.enabled ? 'gemini' : 'offline', ...(gemini.lastError ? { aiLastError: gemini.lastError } : {}) });
+    res.json({
+      ok: true,
+      ai: gemini.enabled ? 'gemini' : 'offline',
+      ...(gemini.enabled ? { model: gemini.model } : {}),
+      ...(gemini.lastError ? { aiLastError: gemini.lastError } : {}),
+    });
   });
 
   app.get('/api/places', async (req, res, next) => {

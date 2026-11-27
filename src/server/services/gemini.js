@@ -1,6 +1,10 @@
 // @ts-check
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
-const TIMEOUT_MS = 20000;
+const TIMEOUT_MS = 15000;
+
+/** Fast, low-cost default; the full Flash model is the backup if Flash-Lite is unavailable. */
+export const DEFAULT_MODEL = 'gemini-flash-lite-latest';
+export const FALLBACK_MODEL = 'gemini-flash-latest';
 
 /**
  * Room for the answer. Newer Gemini models "think" before answering, and on some models
@@ -21,17 +25,20 @@ export class GeminiError extends Error {
  * Minimal Gemini client: one JSON-mode generateContent call. The API key is sent in a header,
  * never in the URL, and never leaves the server. The last failure reason (a short code, never
  * the key or any user data) is kept for the health check and the logs.
- * @param {{ apiKey?: string, model?: string, fetchImpl?: typeof fetch, logger?: Pick<Console, 'warn'> }} opts
+ * @param {{ apiKey?: string, model?: string, fallbackModel?: string, fetchImpl?: typeof fetch, logger?: Pick<Console, 'warn'> }} opts
  */
-export function createGemini({ apiKey, model = 'gemini-flash-latest', fetchImpl = fetch, logger }) {
+export function createGemini({ apiKey, model = DEFAULT_MODEL, fallbackModel = FALLBACK_MODEL, fetchImpl = fetch, logger }) {
   const enabled = Boolean(apiKey);
   const state = { lastError: /** @type {string | null} */ (null) };
 
+  let activeModel = model;
+
   /**
    * @param {object} body
+   * @param {string} [useModel]
    */
-  async function call(body) {
-    const res = await fetchImpl(`${API}/${encodeURIComponent(model)}:generateContent`, {
+  async function call(body, useModel = activeModel) {
+    const res = await fetchImpl(`${API}/${encodeURIComponent(useModel)}:generateContent`, {
       method: 'POST',
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { 'content-type': 'application/json', 'x-goog-api-key': /** @type {string} */ (apiKey) },
@@ -42,7 +49,10 @@ export function createGemini({ apiKey, model = 'gemini-flash-latest', fetchImpl 
 
   return {
     enabled,
-    model,
+    /** The model currently in use (switches to the backup if the first is not found). */
+    get model() {
+      return activeModel;
+    },
     /** Short code for the most recent failure, or null after a success. */
     get lastError() {
       return state.lastError;
@@ -60,7 +70,14 @@ export function createGemini({ apiKey, model = 'gemini-flash-latest', fetchImpl 
       };
       const generationConfig = { responseMimeType: 'application/json', maxOutputTokens: Math.max(maxTokens, MIN_OUTPUT_TOKENS) };
       try {
-        let res = await call({ ...base, generationConfig: { ...generationConfig, thinkingConfig: { thinkingLevel: 'low' } } });
+        const withThinking = { ...base, generationConfig: { ...generationConfig, thinkingConfig: { thinkingLevel: 'low' } } };
+        let res = await call(withThinking);
+        // Model name not available for this key: switch to the backup model for good.
+        if (res.status === 404 && activeModel !== fallbackModel) {
+          logger?.warn(`[gemini] model ${activeModel} not found, using ${fallbackModel}`);
+          activeModel = fallbackModel;
+          res = await call(withThinking);
+        }
         // Older models reject thinkingConfig: retry once without it.
         if (res.status === 400) res = await call({ ...base, generationConfig });
         if (!res.ok) throw new GeminiError(`http-${res.status}`);

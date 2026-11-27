@@ -277,10 +277,27 @@ describe('Gemini client robustness', () => {
     try {
       await post(`${ctx.base}/api/coach`, { plan: samplePlan(), forecast: SAMPLE_FORECAST });
       const text = await (await fetch(`${ctx.base}/api/health`)).text();
-      assert.deepEqual(JSON.parse(text), { ok: true, ai: 'gemini', aiLastError: 'http-429' });
+      assert.deepEqual(JSON.parse(text), { ok: true, ai: 'gemini', model: 'gemini-flash-lite-latest', aiLastError: 'http-429' });
       assert.doesNotMatch(text, /secret-key/);
     } finally {
       ctx.server.close();
     }
+  });
+});
+
+describe('Gemini model choice', () => {
+  it('defaults to Flash-Lite and switches to the backup model if it is not found', async () => {
+    const urls = [];
+    const g = createGemini({ apiKey: 'k', logger: { warn() {} }, fetchImpl: async (url) => {
+      urls.push(String(url));
+      return String(url).includes('flash-lite')
+        ? new Response('{}', { status: 404 })
+        : new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }));
+    } });
+    assert.equal(g.model, 'gemini-flash-lite-latest');
+    assert.deepEqual(await g.generateJson({ system: 's', prompt: 'p' }), { ok: true });
+    assert.equal(g.model, 'gemini-flash-latest');
+    await g.generateJson({ system: 's', prompt: 'p' });
+    assert.equal(urls.filter((u) => u.includes('flash-lite')).length, 1, 'remembers the switch');
   });
 });
