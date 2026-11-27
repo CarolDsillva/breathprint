@@ -38,3 +38,9 @@ export const getCoach = (plan, forecast, language) => request('/api/coach', { me
  * @param {string} question
  */
 export const askWhatIf = (plan, question) => request('/api/whatif', { method: 'POST', body: JSON.stringify({ plan, question }) });
+
+/**
+ * @param {string} image base64 (no data: prefix)
+ * @param {string} mimeType
+ */
+export const scanPhoto = (image, mimeType) => request('/api/scan', { method: 'POST', body: JSON.stringify({ image, mimeType }) });

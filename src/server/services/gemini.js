@@ -13,10 +13,11 @@ export function createGemini({ apiKey, model = 'gemini-flash-latest', fetchImpl 
     enabled,
     model,
     /**
-     * @param {{ system: string, prompt: string, maxTokens?: number }} req
+     * @param {{ system: string, prompt: string, maxTokens?: number, image?: { mimeType: string, data: string } }} req
+     *   `image` is base64 data sent inline (used for room photos).
      * @returns {Promise<unknown>} parsed JSON from the model
      */
-    async generateJson({ system, prompt, maxTokens = 700 }) {
+    async generateJson({ system, prompt, maxTokens = 700, image }) {
       if (!enabled) throw new Error('Gemini is not configured');
       const res = await fetchImpl(`${API}/${encodeURIComponent(model)}:generateContent`, {
         method: 'POST',
@@ -24,7 +25,7 @@ export function createGemini({ apiKey, model = 'gemini-flash-latest', fetchImpl 
         headers: { 'content-type': 'application/json', 'x-goog-api-key': /** @type {string} */ (apiKey) },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          contents: [{ role: 'user', parts: [{ text: prompt }, ...(image ? [{ inlineData: image }] : [])] }],
           generationConfig: { responseMimeType: 'application/json', maxOutputTokens: maxTokens },
         }),
       });

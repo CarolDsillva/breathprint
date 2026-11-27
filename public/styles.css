@@ -12,7 +12,7 @@
   --line-strong: rgb(255 255 255 / .18);
   --fg: #ecedee;
   --muted: #9aa0a8;
-  --faint: #6b717a;
+  --faint: #80868f; /* 4.7:1 on raised panels, WCAG AA */
   --sky: #9fd7ff;
   --good: #4cd6a0;
   --bad: #ff8a80;
@@ -95,14 +95,14 @@ label.inline { flex-direction: row; align-items: center; gap: .6rem; }
 .brand-mark { width: 22px; height: 22px; fill: none; stroke: var(--fg); stroke-width: 1.8; stroke-linecap: round; }
 .topnav { display: flex; gap: 4px; }
 .topnav a {
-  display: flex; justify-content: space-between; gap: 1.4rem; min-width: 8.5rem; padding: .5rem .65rem;
+  display: flex; justify-content: space-between; gap: .9rem; padding: .5rem .6rem;
   border: 1px solid var(--line); color: var(--fg); text-decoration: none;
   font: 500 11.5px var(--mono); letter-spacing: .05em; text-transform: uppercase;
 }
 .topnav a span { color: var(--faint); }
 .topnav a:hover { border-color: var(--line-strong); background: var(--surface); }
 .spacer { flex: 1; }
-@media (max-width: 1060px) { .topnav { display: none; } }
+@media (max-width: 1180px) { .topnav { display: none; } }
 @media (max-width: 520px) { .place-chip { display: none !important; } }
 
 /* ---------- hero ---------- */
@@ -257,3 +257,21 @@ thead th { font: 500 11px var(--mono); letter-spacing: .05em; text-transform: up
   .meter > span, .air-strip .bar { transition: height .3s ease, width .3s ease; }
 }
 input[type="checkbox"].input { width: 18px; min-height: 0; padding: 0; }
+
+/* season + community impact */
+.impact { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 12px; margin-bottom: 20px; }
+.impact-card { background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 16px; }
+.impact-card p { margin: .5rem 0 0; }
+.impact-card .num { font-size: 1.6rem; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--good); }
+.inline-num { flex-direction: row; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; font-size: 14px; }
+.inline-num .input { width: 7rem; }
+.impact-list { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: .25rem; }
+
+/* smoke detective */
+.scan-preview { display: block; max-width: min(100%, 360px); max-height: 260px; border-radius: 6px; border: 1px solid var(--line); margin: 4px 0 8px; object-fit: cover; }
+.checklist { margin: 12px 0; }
+.checklist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0 1rem; }
+.fixes { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 10px; }
+.fixes li { background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: .45rem; }
+.fixes .evidence { font: 11px var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--sky); }
+input[type="file"].input { padding: .5rem; }

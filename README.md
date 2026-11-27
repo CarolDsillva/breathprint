@@ -1,5 +1,9 @@
 # Breathprint
 
+[![CI](https://github.com/CarolDsillva/breathprint/actions/workflows/ci.yml/badge.svg)](https://github.com/CarolDsillva/breathprint/actions/workflows/ci.yml)
+
+**Live app:** https://breathprint-jade.vercel.app/
+
 **Every breath leaves a print.** Breathprint is a GenAI-powered urban air quality assistant for families in smog-hit cities. You tell it who lives at home and what their day looks like. It works out how much PM2.5 smog **each person actually breathes, hour by hour**, then finds the choices that cut it. Each choice shows two impacts side by side:
 
 - 🫁 **What your family breathes:** micrograms of PM2.5 inhaled, cigarette-equivalents, and how many times the WHO guideline.
@@ -21,7 +25,11 @@ Most air-quality apps show a city AQI number and generic advice ("wear a mask").
 | **Two-sided ledger** | Every suggestion shows breathed *and* emitted impact, e.g. *metro instead of auto: Priya breathes 3% less and the city gets 540 g less CO₂.* |
 | **"What if…?" box** | Ask in plain words: *"What if Aarav plays cricket at 2pm?"* Gemini turns the question into a structured change; the engine computes before and after for every family member. |
 | **Family briefing (Gemini)** | A short, warm summary in English or Hindi, written **only from the engine's numbers**. |
+| **Smoke Detective (Gemini vision)** | Snap your kitchen, bedroom or puja corner. Gemini spots smoke sources and leaks (stove without chimney, incense, mosquito coil, open window, door gaps, purifier, plants…) from a fixed list; each finding becomes a fix with its **computed** impact on your family. A checklist does the same without a photo or AI key. |
+| **Smog-season savings** | *"If every day until 28 Feb looks like this one, the smarter plan spares Aarav ≈ 237 cigarettes' worth of smoke."* |
+| **Neighbourhood ripple** | *"If 100 families nearby made the same switches: 63 kg less CO₂ and ≈ 1,200 cigarettes' worth of smoke not breathed, in one day."* Communities, not just households. |
 | **Clean-room calculator** | A mass-balance model: how many minutes your purifier (or a DIY box-fan filter) needs to make the bedroom safe, and the CADR you actually need. |
+| **Works offline, installable** | A service worker caches the app, so the sample day and every calculation work with no network; it installs to a phone's home screen. |
 
 ## How it works
 
@@ -48,6 +56,7 @@ Most air-quality apps show a city AQI number and generic advice ("wear a mask").
 3. **GenAI layer** (`src/server/coach.js`):
    - **Briefing:** Gemini gets a compact facts object (numbers computed by the engine) and must reply in a fixed JSON shape; the output is sanitised and length-capped.
    - **What-if:** Gemini maps free text to `{activityId, start, mode, source, windows, purifier}`. The answer is checked against the plan (only known ids and modes, no clashes). If it is invalid, the offline parser takes over.
+   - **Smoke Detective:** the photo is shrunk to at most 1024 px on the device (the original and its location data never leave the phone), checked on the server (JPEG/PNG/WebP only, real file signature, 1 MB cap, separate body limit), sent inline to Gemini, and **never stored or logged**. Gemini may only answer with ids from a fixed list (`src/engine/scan.js`); the engine turns those into plan changes.
    - **No numbers are invented by the model.** Everything the user sees as a figure comes from the engine.
 
 ### Decision logic (summary)
@@ -61,20 +70,22 @@ Most air-quality apps show a city AQI number and generic advice ("wear a mask").
 npm install
 cp .env.example .env        # optional: add GEMINI_API_KEY for AI briefings
 npm start                   # http://localhost:8080
-npm test                    # 52 tests, no network needed
+npm test                    # 72 tests, no network needed
 npm run coverage            # ~99% line coverage
+npm run check               # ESLint + TypeScript type-check (JSDoc) + tests
 ```
 
-Without a Gemini key the app still works fully: briefings use a deterministic template and what-ifs use the offline parser. Press **Try a Delhi smog day** to explore without any network access.
+Without a Gemini key the app still works fully: briefings use a deterministic template, what-ifs use the offline parser and Smoke Detective uses the checklist. Press **Try a Delhi smog day** to explore without any network access.
 
 **Deploy (Google Cloud Run):** `gcloud run deploy breathprint --source . --set-secrets GEMINI_API_KEY=gemini-key:latest`
 
 ## Quality, security, efficiency, accessibility
 
-- **Testing:** `node:test`, 52 tests covering the dose maths against hand calculations, linearity, emissions, feasibility rules, the optimiser, the parsers, validation and injection stripping, plus HTTP tests for headers, caching, rate limits, fallbacks, error handling and key handling (Gemini and Open-Meteo are stubbed).
-- **Security:** API key only on the server, sent in a header (never in a URL); Helmet with a strict Content-Security-Policy (no inline scripts or styles); JSON body limit 32 KB; rate limits (120/min, 15/min for AI routes); strict allow-list validation of every input; model output treated as untrusted and re-validated; all text rendered with `textContent` (no `innerHTML`); upstream errors hidden behind friendly messages; non-root Docker image.
-- **Efficiency:** the engine runs in the browser (instant recalculation, no server round-trip); forecasts cached per grid cell with in-flight de-duplication; identical briefing requests cached for 10 minutes; 3 runtime dependencies, no front-end build, the repo is a few hundred KB.
-- **Accessibility:** semantic landmarks, skip link, every input labelled, `fieldset`/`legend` groups, live regions for results, focus moved to results after big changes, colour never used alone (every band and chip has words, ↑/↓ arrows and patterns), text descriptions for the charts, keyboard-only use, 40 px+ targets, `prefers-reduced-motion`, Hindi output with `lang` set.
+- **Code quality:** ESLint (recommended rules plus `eqeqeq`, `no-eval` and others) and a strict TypeScript check of the JSDoc types across server, engine and browser code. Both run in **GitHub Actions CI** on Node 20 and 22 with tests, coverage and `npm audit`.
+- **Testing:** `node:test`, 72 tests, about 99% line coverage. They cover the dose maths against hand calculations, linearity, emissions, feasibility rules, the optimiser, the parsers, validation and injection stripping, plus HTTP tests for headers, caching, rate limits, fallbacks, error handling and key handling (Gemini and Open-Meteo are stubbed). Also tested: the photo checks (fake signatures, oversized files), the scan route, season and neighbourhood maths, the offline file list, and an automated **axe-core WCAG 2.1 AA audit** of the page.
+- **Security:** API key only on the server, sent in a header (never in a URL); Helmet with a strict Content-Security-Policy (no inline scripts or styles); JSON body limit 32 KB; rate limits (120/min, 15/min for AI routes); strict allow-list validation of every input; model output treated as untrusted and re-validated (prompts mark user text and photo text as data, not instructions); photos are checked by magic bytes and never stored; all text rendered with `textContent` (no `innerHTML`); upstream errors hidden behind friendly messages; non-root Docker image.
+- **Efficiency:** photos are resized on the device before upload; the service worker serves the app shell offline; the engine runs in the browser (instant recalculation, no server round-trip); forecasts cached per grid cell with in-flight de-duplication; identical briefing requests cached for 10 minutes; 3 runtime dependencies, no front-end build, the repo is a few hundred KB.
+- **Accessibility:** semantic landmarks, skip link, every input labelled, `fieldset`/`legend` groups, live regions for results, focus moved to results after big changes, colour never used alone (every band and chip has words, ↑/↓ arrows and patterns), text descriptions for the charts, keyboard-only use, 40 px+ targets, `prefers-reduced-motion`, Hindi output with `lang` set, text contrast of at least 4.5:1 everywhere, a photo-free checklist alternative to Smoke Detective, and the axe-core audit in CI.
 
 ## Assumptions and limits
 
@@ -84,13 +95,16 @@ Without a Gemini key the app still works fully: briefings use a deterministic te
 - Emission factors are indicative Indian fleet averages per km (e.g. car 140 g CO₂, auto 60 g, two-wheeler 45 g, bus 25 g and metro 15 g per passenger).
 - Cigarette equivalence: Berkeley Earth's rule of thumb (22 µg/m³ for 24 h ≈ 1 cigarette).
 - Forecasts are model estimates (CAMS), not station readings. Everyone sleeps 10 PM–6 AM unless the plan says otherwise.
+- Season savings assume every remaining smog-season day (to 28 Feb) is like the planned one; the neighbourhood ripple assumes each family makes the same switches.
 - These are **estimates for comparing choices, not medical advice.** See [docs/science.md](docs/science.md).
 
 ## Project layout
 
 ```
-src/engine/    pure model: dose, emissions, scenarios, optimiser, room, intent, validation, sample data
-src/server/    Express app, cache, Open-Meteo and Gemini clients, coaching and what-if logic
-public/        accessible front end (HTML, CSS, ES modules)
-test/          node:test suites (engine, inputs, server)
+src/engine/    pure model: dose, emissions, scenarios, optimiser, room, impact (season/ripple),
+               scan (Smoke Detective rules), intent, validation, sample data
+src/server/    Express app, cache, image checks, Open-Meteo and Gemini clients, coaching, what-if and scan logic
+public/        accessible front end (HTML, CSS, ES modules), manifest and service worker
+test/          node:test suites (engine, inputs, server, features, a11y)
+.github/       CI workflow
 ```

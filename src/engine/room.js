@@ -45,6 +45,7 @@ export function purifierPlan(input) {
   const start = input.startPm ?? (P * a * input.outdoorPm) / (a + k);
   const target = input.targetPm ?? 35;
 
+  /** @type {number | null} */
   let minutes = null;
   if (start <= target) minutes = 0;
   else if (steady < target) minutes = Math.ceil((-Math.log((target - steady) / (start - steady)) / removal) * 60);

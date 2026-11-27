@@ -17,6 +17,7 @@ describe('validatePlan', () => {
     p.members[0].name = '<img src=x onerror=alert(1)>Priya\u0007';
     const r = validatePlan(p);
     assert.equal(r.ok, true);
+    // eslint-disable-next-line no-control-regex -- checks that the BEL character was removed
     assert.doesNotMatch(r.plan.members[0].name, /[<>\u0007]/);
   });
 

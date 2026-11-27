@@ -67,6 +67,7 @@ function toSuggestion(type, change, r, why, costly = false) {
 function bestShift(plan, pm, a) {
   const win = a.window ?? { from: 6, to: 21 };
   const hours = activityHours(a);
+  /** @type {{ change: Change, r: ReturnType<typeof compareChange> } | null} */
   let best = null;
   for (let s = win.from; s + hours <= win.to + 1e-9; s += 0.5) {
     if (Math.abs(s - a.start) < 1e-9) continue;
@@ -86,6 +87,7 @@ function bestShift(plan, pm, a) {
  * @param {import('./dose.js').Activity} a
  */
 function bestMode(plan, pm, a) {
+  /** @type {{ change: Change, r: ReturnType<typeof compareChange> } | null} */
   let best = null;
   for (const mode of /** @type {(keyof typeof MODES)[]} */ (Object.keys(MODES))) {
     if (mode === a.mode) continue;

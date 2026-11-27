@@ -5,7 +5,8 @@ import express from 'express';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { isForecast, validatePlan, cleanText } from '../engine/validate.js';
-import { LANGUAGES, coach, interpretWhatIf } from './coach.js';
+import { LANGUAGES, coach, interpretWhatIf, scanRoom } from './coach.js';
+import { decodeImage } from './image.js';
 import { TtlCache } from './cache.js';
 import { createHash } from 'node:crypto';
 
@@ -34,7 +35,7 @@ export function createApp({ air, gemini, rateLimitPerMinute = 120, aiRateLimitPe
           'script-src': ["'self'"],
           'style-src': ["'self'", 'https://fonts.googleapis.com'],
           'font-src': ["'self'", 'https://fonts.gstatic.com'],
-          'img-src': ["'self'", 'data:'],
+          'img-src': ["'self'", 'data:', 'blob:'],
           'connect-src': ["'self'"],
           'object-src': ["'none'"],
           'frame-ancestors': ["'none'"],
@@ -43,11 +44,26 @@ export function createApp({ air, gemini, rateLimitPerMinute = 120, aiRateLimitPe
       crossOriginEmbedderPolicy: false,
     }),
   );
-  app.use(express.json({ limit: '32kb' }));
-
   const limiter = (/** @type {number} */ limit) => rateLimit({ windowMs: 60_000, limit, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many requests, please wait a minute.' } });
   app.use('/api/', limiter(rateLimitPerMinute));
   const aiLimiter = limiter(aiRateLimitPerMinute);
+
+  // Room photos are the only large requests: they get their own body limit, every other
+  // route keeps 32 KB. Photos are checked, sent to Gemini and never stored or logged.
+  app.post('/api/scan', aiLimiter, express.json({ limit: '1600kb' }), async (req, res, next) => {
+    if (!gemini.enabled) return res.status(503).json({ error: 'Photo scanning needs the AI service, which is not set up on this server.' });
+    const image = decodeImage(req.body?.image, req.body?.mimeType);
+    if ('error' in image) return res.status(400).json({ error: image.error });
+    try {
+      const result = await scanRoom(gemini, image);
+      if (!result) return res.status(502).json({ error: 'Could not read that photo. Try another angle.' });
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.use(express.json({ limit: '32kb' }));
 
   // Identical coaching requests (same plan, same air) reuse the last answer for 10 minutes.
   const coachCache = new TtlCache({ ttlMs: 10 * 60_000, max: 300 });

@@ -11,10 +11,12 @@ import {
   suggest,
   validatePlan,
 } from '/engine/index.js';
+import { communityRipple, seasonSavings, smogSeasonDaysLeft } from '/engine/impact.js';
 import { askWhatIf, getCoach, getForecast, searchPlaces } from './api.js';
 import { byId, h } from './dom.js';
 import { createEditor } from './editor.js';
-import { comparisonCard, renderAirStrip, renderBudget, renderHourGrid, renderRoom, renderStats, renderSuggestions } from './render.js';
+import { initScan } from './scan.js';
+import { comparisonCard, renderAirStrip, renderBudget, renderHourGrid, renderRipple, renderRoom, renderSeason, renderStats, renderSuggestions } from './render.js';
 
 const STORAGE_KEY = 'breathprint:plan:v1';
 
@@ -25,6 +27,7 @@ const state = {
   /** @type {{ date: string, pm25: (number | null)[] }[]} */ days: [],
   /** @type {(number | null)[] | null} */ forecast: null,
   place: '',
+  /** @type {{ day: any, smarter: any } | null} */ impact: null,
 };
 
 const el = {
@@ -186,6 +189,18 @@ el.daySelect.addEventListener('change', selectDay);
 
 /* ---------- budget & suggestions ---------- */
 
+const familiesInput = /** @type {HTMLInputElement} */ (byId('families'));
+function updateRipple() {
+  if (!state.impact) return;
+  const n = Number(familiesInput.value);
+  if (!(n >= 1 && n <= 100000)) {
+    byId('ripple-out').replaceChildren(h('p', { class: 'error' }, 'Enter between 1 and 100,000 families.'));
+    return;
+  }
+  renderRipple(byId('ripple-out'), communityRipple(state.impact.day, state.impact.smarter, n));
+}
+familiesInput.addEventListener('input', updateRipple);
+
 let recomputeTimer = 0;
 function recompute() {
   window.clearTimeout(recomputeTimer);
@@ -209,7 +224,15 @@ function runBudget() {
   const top = [...day.members].sort((a, b) => b.cigarettes - a.cigarettes)[0];
   const topName = checked.plan.members.find((m) => m.id === top.memberId)?.name;
   el.resultsStatus.textContent = `Updated. ${topName} breathes the most on this day: about ${top.cigarettes.toFixed(1)} cigarettes' worth.`;
-  renderStats(el.stats, day, computeDay(optimizeDay(checked.plan, state.forecast).plan, state.forecast));
+  const smarter = computeDay(optimizeDay(checked.plan, state.forecast).plan, state.forecast);
+  renderStats(el.stats, day, smarter);
+  // Season and neighbourhood totals always compare the family's own plan with the smarter one,
+  // even after some changes have been applied.
+  const original = state.original ? validatePlan(state.original) : null;
+  const baseline = original?.ok ? computeDay(original.plan, state.forecast) : day;
+  renderSeason(byId('season-out'), checked.plan, seasonSavings(baseline, smarter, smogSeasonDaysLeft(new Date())));
+  state.impact = { day: baseline, smarter };
+  updateRipple();
   renderHourGrid(el.hourGrid, checked.plan, state.forecast, memberTimeline);
   renderBudget(el.budget, checked.plan, day);
   renderSuggestions(el.suggestions, suggest(checked.plan, state.forecast).slice(0, 6), applySuggestion);
@@ -364,5 +387,13 @@ const editor = createEditor({
 });
 editor.render();
 syncHomeControls();
+initScan({ getPlan: () => state.plan, getForecast: () => state.forecast, apply: applySuggestion });
 runRoom();
 runBudget();
+
+/* ---------- offline support ---------- */
+
+if ('serviceWorker' in navigator) {
+  // Registration failing (e.g. in a private window) must not break the app.
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}

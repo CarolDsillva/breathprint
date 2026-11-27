@@ -158,7 +158,7 @@ export function renderStats(el, day, smarter) {
   const volume = day.members.reduce((/** @type {number} */ s, /** @type {any} */ m) => s + m.volume, 0);
   const who = day.total / (WHO_24H_PM25 * volume);
   const cut = day.total > 0 ? ((day.total - smarter.total) / day.total) * 100 : 0;
-  const stat = (/** @type {string} */ k, /** @type {Node[]} */ v, /** @type {string} */ d, /** @type {string} */ cls = '') =>
+  const stat = (/** @type {string} */ k, /** @type {(Node | string)[]} */ v, /** @type {string} */ d, /** @type {string} */ cls = '') =>
     h('div', { class: 'stat' }, h('p', { class: 'k' }, k), h('p', { class: `v ${cls}` }, ...v), h('p', { class: 'd' }, d));
   el.replaceChildren(
     stat('Your family’s day, as planned', [fmt(day.total), h('small', null, 'µg')], `of PM2.5 inhaled from ${fmt1(volume)} m³ of air`),
@@ -198,5 +198,52 @@ export function renderHourGrid(el, plan, pm, timeline) {
     h('div', { class: 'legend', 'aria-hidden': 'true' },
       ...[['outdoor', 'Outdoors'], ['commute', 'Travelling'], ['indoor-away', 'School / office'], ['home', 'At home'], ['smoke', 'Indoor smoke'], ['sleep', 'Asleep']]
         .map(([k, l]) => h('span', null, h('i', { class: `cell ${k}` }), l))),
+  );
+}
+
+/**
+ * Smog-season savings per person and the trip emissions kept out of the air.
+ * @param {HTMLElement} el
+ * @param {any} plan
+ * @param {ReturnType<typeof import('/engine/impact.js').seasonSavings>} season
+ */
+export function renderSeason(el, plan, season) {
+  if (season.days === 0) {
+    el.replaceChildren(h('p', { class: 'hint' }, 'The smog season (15 Oct to 28 Feb) is over. Keep this plan for next winter.'));
+    return;
+  }
+  const people = season.people.filter((p) => p.cigarettesAvoided >= 1);
+  /** @type {HTMLElement[]} */
+  const parts = [
+    h('p', null, `If every day until 28 Feb (${season.days} days) looks like this one, the smarter plan spares:`),
+    people.length
+      ? h('ul', { class: 'impact-list' }, ...people.map((p) => {
+        const name = plan.members.find((/** @type {any} */ m) => m.id === p.memberId)?.name ?? p.memberId;
+        return h('li', null, h('span', { class: 'num' }, `≈ ${fmt(p.cigarettesAvoided)}`), ` cigarettes' worth for ${name}`);
+      }))
+      : h('p', { class: 'hint' }, 'Your plan is already close to the cleanest it can be.'),
+  ];
+  if (season.co2KgAvoided >= 0.1) parts.push(h('p', null, `…and keeps ${fmt1(season.co2KgAvoided)} kg of CO₂ out of your city's air.`));
+  parts.push(h('p', { class: 'hint' }, 'Estimate: assumes each remaining day has similar air and the same routine.'));
+  el.replaceChildren(...parts);
+}
+
+/**
+ * Neighbourhood totals for one day.
+ * @param {HTMLElement} el
+ * @param {ReturnType<typeof import('/engine/impact.js').communityRipple>} r
+ */
+export function renderRipple(el, r) {
+  if (r.co2KgAvoided < 0.01 && r.cigarettesAvoided < 0.05) {
+    el.replaceChildren(h('p', { class: 'hint' }, 'Apply some changes first: there is nothing to multiply yet.'));
+    return;
+  }
+  el.replaceChildren(
+    h('ul', { class: 'impact-list' },
+      h('li', null, h('span', { class: 'num' }, `≈ ${fmt(r.cigarettesAvoided)}`), ` cigarettes' worth of smoke not breathed (${fmt1(r.pmGramsNotBreathed)} g of PM2.5)`),
+      h('li', null, h('span', { class: 'num' }, `${fmt1(r.co2KgAvoided)} kg`), ' less CO₂ from trips'),
+      h('li', null, h('span', { class: 'num' }, `${fmt1(r.pmGramsNotEmitted)} g`), ' less PM2.5 from exhaust, brakes and tyres'),
+    ),
+    h('p', { class: 'hint' }, 'In one day. Share your plan with neighbours and your society’s WhatsApp group.'),
   );
 }

@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "paths": {
+      "/engine/*": [
+        "./src/engine/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.js",
+    "public/js/*.js"
+  ],
+  "exclude": [
+    "public/sw.js"
+  ]
+}
