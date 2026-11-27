@@ -116,6 +116,10 @@ export function initScan(ctx) {
         input.checked = ids.includes(input.value);
       }
       say(r.summary || `Found ${ids.length} item${ids.length === 1 ? '' : 's'}.`);
+      if (!ids.length) {
+        out.replaceChildren(h('p', { class: 'hint' }, 'Nothing to act on in this photo. Try a wider shot of the kitchen, bedroom or puja corner, or tick the checklist above.'));
+        return;
+      }
       showFixes(ids, Object.fromEntries(r.findings.map((/** @type {{ id: string, evidence: string }} */ f) => [f.id, f.evidence])));
     } catch (err) {
       say(`${/** @type {Error} */ (err).message} You can use the checklist below instead.`, true);
