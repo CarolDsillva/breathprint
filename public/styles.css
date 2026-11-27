@@ -275,3 +275,4 @@ input[type="checkbox"].input { width: 18px; min-height: 0; padding: 0; }
 .fixes li { background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: .45rem; }
 .fixes .evidence { font: 11px var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--sky); }
 input[type="file"].input { padding: .5rem; }
+.scan-preview[hidden] { display: none; }
