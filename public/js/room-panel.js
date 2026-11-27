@@ -1,7 +1,7 @@
 // @ts-check
 /** Section 05: how long a purifier takes to make the bedroom safe, and whether it is big enough. */
 import { PURIFIERS, SAMPLE_FORECAST, purifierPlan } from '/engine/index.js';
-import { message } from './components.js';
+import { announce, message } from './components.js';
 import { byId, fmt, fmt1, h } from './dom.js';
 import { state, subscribe } from './state.js';
 
@@ -10,6 +10,8 @@ import { state, subscribe } from './state.js';
 const MAX_ROOM_SIDE_M = 20;
 /** Night-time hours (the end of the forecast day) set the outdoor air while people sleep. */
 const NIGHT_HOURS = 6;
+/** Wait for typing to pause before speaking the new result. */
+const ANNOUNCE_DELAY_MS = 700;
 
 /**
  * @param {HTMLElement} el
@@ -50,26 +52,46 @@ export function initRoomPanel() {
     ...Object.entries(PURIFIERS).map(([id, p]) => h('option', { value: id, selected: id === 'medium' }, p.label)),
   );
 
-  function run() {
+  const status = byId('room-announce');
+  let announceTimer = 0;
+  /** @param {string} text */
+  const sayLater = (text) => {
+    window.clearTimeout(announceTimer);
+    announceTimer = window.setTimeout(() => announce(status, text), ANNOUNCE_DELAY_MS);
+  };
+
+  /** @param {boolean} speak announce the result (only after the user changes something) */
+  function run(speak) {
     const [lengthM, widthM, heightM] = [metres('room-l'), metres('room-w'), metres('room-h-in')];
     if (![lengthM, widthM, heightM].every((d) => d > 0 && d <= MAX_ROOM_SIDE_M)) {
       out.replaceChildren(message('Enter room sizes between 1 and 20 metres.', true));
+      if (speak) sayLater('Enter room sizes between 1 and 20 metres.');
       return;
     }
     const known = /** @type {number[]} */ ((state.forecast ?? SAMPLE_FORECAST).filter((v) => v !== null));
     const outdoorPm = Math.max(...known.slice(-NIGHT_HOURS));
     const chosen = PURIFIERS[/** @type {PurifierId} */ (purifier.value)];
-    renderRoom(
-      out,
-      purifierPlan({ lengthM, widthM, heightM, cadr: chosen.cadr, outdoorPm, windowsOpen: windowOpen.checked }),
-      chosen.label,
+    const result = purifierPlan({
+      lengthM,
+      widthM,
+      heightM,
+      cadr: chosen.cadr,
+      outdoorPm,
+      windowsOpen: windowOpen.checked,
+    });
+    renderRoom(out, result, chosen.label);
+    if (!speak) return;
+    sayLater(
+      result.minutes === null
+        ? `${chosen.label}: not enough to make this room safe.`
+        : `${chosen.label}: about ${result.minutes} minutes to clean the room.`,
     );
   }
 
-  form.addEventListener('input', run);
+  form.addEventListener('input', () => run(true));
   form.addEventListener('submit', (e) => e.preventDefault());
   subscribe((kind) => {
-    if (kind === 'forecast') run();
+    if (kind === 'forecast') run(false);
   });
-  run();
+  run(false);
 }

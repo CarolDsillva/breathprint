@@ -23,26 +23,35 @@ const PART_OF_DAY = /** @type {const} */ ([
   [/\bnight\b/, 20],
 ]);
 
+const CLOCK_WITH_SUFFIX = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)/;
+const CLOCK_AFTER_AT = /\bat (\d{1,2})(?::(\d{2}))?\b/;
+
 /**
- * Read a clock time from text. Returns a decimal hour or null.
+ * Convert clock parts to a decimal hour rounded to the half hour, or null if impossible.
+ * A bare "at 1"–"at 6" is read as afternoon: the hours families plan activities around.
+ * @param {number} hour
+ * @param {number} minute
+ * @param {string | undefined} suffix "am", "pm" or none
+ */
+function toDecimalHour(hour, minute, suffix) {
+  if (hour > 23 || minute > 59) return null;
+  let h = hour;
+  if (suffix === 'pm' && h < 12) h += 12;
+  else if (suffix === 'am' && h === 12) h = 0;
+  else if (!suffix && h >= 1 && h <= 6) h += 12;
+  return h + Math.round(minute / 30) * 0.5;
+}
+
+/**
+ * Read a clock time ("2pm", "7:30 am", "at 5") or a part of the day ("afternoon") from text.
  * @param {string} text lower-case
+ * @returns {number | null} decimal hour
  */
 export function parseTime(text) {
-  const m =
-    text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)/) ?? text.match(/\bat (\d{1,2})(?::(\d{2}))?\b/);
-  if (m) {
-    let h = Number(m[1]);
-    const min = m[2] ? Number(m[2]) : 0;
-    const suffix = m[3]?.replace(/\./g, '');
-    if (h > 23 || min > 59) return null;
-    if (suffix === 'pm' && h < 12) h += 12;
-    if (suffix === 'am' && h === 12) h = 0;
-    // "at 5" with no am/pm: assume daytime hours people plan around.
-    if (!suffix && h >= 1 && h <= 6) h += 12;
-    return h + Math.round(min / 30) * 0.5;
-  }
-  for (const [re, hour] of PART_OF_DAY) if (re.test(text)) return hour;
-  return null;
+  const m = text.match(CLOCK_WITH_SUFFIX) ?? text.match(CLOCK_AFTER_AT);
+  if (m) return toDecimalHour(Number(m[1]), m[2] ? Number(m[2]) : 0, m[3]?.replace(/\./g, ''));
+  const part = PART_OF_DAY.find(([re]) => re.test(text));
+  return part ? part[1] : null;
 }
 
 /**
@@ -71,34 +80,65 @@ export function matchActivity(text, plan) {
   return best;
 }
 
+/** @typedef {import('./scenario.js').Change} Change */
+
 /**
+ * Home-level changes: purifier on/off, windows open/shut.
+ * @param {string} text lower-case
+ * @returns {Change}
+ */
+function homeChange(text) {
+  /** @type {Change} */
+  const change = {};
+  if (/\bpurifier\b/.test(text)) change.purifier = !/\b(no|without|off|turn off)\b.*purifier/.test(text);
+  if (/\bwindows?\b/.test(text)) change.windows = /\b(close|closed|shut)\b/.test(text) ? 'closed' : 'open';
+  return change;
+}
+
+/**
+ * A new smoke source for an at-home activity: a chimney, or skipping the smoke entirely.
+ * @param {string} text lower-case
+ * @param {import('./dose.js').Activity} a
+ * @returns {Change['source']}
+ */
+function sourceChange(text, a) {
+  if (a.kind !== 'home') return undefined;
+  if (/\b(exhaust|chimney)\b/.test(text)) return 'gas-cooking-exhaust';
+  const skipping = /\b(skip|no|without|stop)\b/.test(text);
+  return skipping && a.source && a.source !== 'none' ? 'none' : undefined;
+}
+
+/**
+ * Changes to one activity: a new transport mode, smoke source or start time.
+ * @param {string} text lower-case
+ * @param {import('./dose.js').Activity} a
+ * @returns {Change}
+ */
+function activityChange(text, a) {
+  const modeWord = a.kind === 'commute' ? MODE_WORDS.find(([, re]) => re.test(text)) : undefined;
+  const mode = modeWord && modeWord[0] !== a.mode ? modeWord[0] : undefined;
+  const source = sourceChange(text, a);
+  const start = mode ? null : parseTime(text);
+  if (!mode && !source && start === null) return {};
+  return {
+    activityId: a.id,
+    ...(mode ? { mode } : {}),
+    ...(source ? { source } : {}),
+    ...(start !== null ? { start } : {}),
+  };
+}
+
+/**
+ * Understand a what-if question without AI.
  * @param {string} question
  * @param {import('./dose.js').Plan} plan
- * @returns {{ change: import('./scenario.js').Change | null, note: string }}
+ * @returns {{ change: Change | null, note: string }}
  */
 export function parseWhatIf(question, plan) {
   const text = question.toLowerCase();
-  /** @type {import('./scenario.js').Change} */
-  const change = {};
-
-  if (/\bpurifier\b/.test(text)) change.purifier = !/\b(no|without|off|turn off)\b.*purifier/.test(text);
-  if (/\bwindows?\b/.test(text)) change.windows = /\b(close|closed|shut)\b/.test(text) ? 'closed' : 'open';
-
-  const a = matchActivity(text, plan);
-  if (a) {
-    if (a.kind === 'commute') {
-      const mode = MODE_WORDS.find(([, re]) => re.test(text));
-      if (mode && mode[0] !== a.mode) change.mode = mode[0];
-    }
-    if (a.kind === 'home') {
-      if (/\b(exhaust|chimney)\b/.test(text)) change.source = 'gas-cooking-exhaust';
-      else if (/\b(skip|no|without|stop)\b/.test(text) && a.source && a.source !== 'none') change.source = 'none';
-    }
-    const t = parseTime(text);
-    if (t !== null && !change.mode) change.start = t;
-    if (change.mode || change.source || change.start !== undefined) change.activityId = a.id;
-  }
-
+  const activity = matchActivity(text, plan);
+  /** @type {Change} */
+  const change = { ...homeChange(text), ...(activity ? activityChange(text, activity) : {}) };
   const understood = Object.keys(change).length > 0;
   return {
     change: understood ? change : null,

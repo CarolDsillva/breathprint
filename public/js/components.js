@@ -120,3 +120,31 @@ export function sourceNote(text) {
 export function message(text, error = false) {
   return h('p', { class: error ? 'error' : 'status' }, text);
 }
+
+/**
+ * Tell screen-reader users what changed, in one short sentence. The region is a hidden
+ * role="status" element; clearing it first makes repeated messages announce again.
+ * @param {HTMLElement} region
+ * @param {string} text
+ */
+export function announce(region, text) {
+  region.textContent = '';
+  window.setTimeout(() => {
+    region.textContent = text;
+  }, 50);
+}
+
+/**
+ * Short spoken summary of a change's two impacts, e.g. "family breathes 3.8% less; city gets 90 g CO₂ less".
+ * @param {{ dosePct: number, co2: number }} impact
+ */
+export function impactSummary(impact) {
+  const parts = [];
+  if (Math.abs(impact.dosePct) >= MIN_VISIBLE_DOSE_PCT) {
+    parts.push(`family breathes ${fmt1(Math.abs(impact.dosePct))}% ${impact.dosePct < 0 ? 'less' : 'more'}`);
+  }
+  if (Math.abs(impact.co2) >= MIN_VISIBLE_CO2_G) {
+    parts.push(`city gets ${fmt(Math.abs(impact.co2))} g CO₂ ${impact.co2 < 0 ? 'less' : 'more'}`);
+  }
+  return parts.join('; ') || 'little difference';
+}

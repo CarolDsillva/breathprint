@@ -81,6 +81,26 @@ describe('HTTP API (offline AI)', () => {
     assert.equal(r.headers.get('x-powered-by'), null);
   });
 
+  it('loads nothing from other sites and limits browser features', async () => {
+    const r = await fetch(`${ctx.base}/`);
+    const csp = r.headers.get('content-security-policy');
+    assert.doesNotMatch(csp, /https?:\/\//, 'no third-party origins in the CSP');
+    assert.match(csp, /font-src 'self'/);
+    assert.match(csp, /form-action 'self'/);
+    const permissions = r.headers.get('permissions-policy');
+    assert.match(permissions, /microphone=\(\)/);
+    assert.match(permissions, /payment=\(\)/);
+    assert.match(permissions, /geolocation=\(self\)/);
+    assert.ok(r.headers.get('strict-transport-security'));
+    assert.equal(r.headers.get('referrer-policy'), 'no-referrer');
+  });
+
+  it('serves the self-hosted fonts', async () => {
+    const r = await fetch(`${ctx.base}/fonts/Geist-Variable.woff2`);
+    assert.equal(r.status, 200);
+    assert.match(r.headers.get('content-type'), /font\/woff2/);
+  });
+
   it('serves the shared engine to the browser', async () => {
     const r = await fetch(`${ctx.base}/engine/dose.js`);
     assert.equal(r.status, 200);

@@ -257,5 +257,7 @@ describe('offline support', () => {
     }
     const engine = (await readdir(new URL('../src/engine/', import.meta.url))).filter((f) => f.endsWith('.js'));
     for (const f of engine) assert.ok(shell.includes(`/engine/${f}`), `sw.js should cache /engine/${f}`);
+    const browser = (await readdir(new URL('../public/js/', import.meta.url))).filter((f) => f.endsWith('.js'));
+    for (const f of browser) assert.ok(shell.includes(`/js/${f}`), `sw.js should cache /js/${f}`);
   });
 });

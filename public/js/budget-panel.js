@@ -1,16 +1,10 @@
 // @ts-check
 /** Section 03: the family's breath budget, the choices that change it, and their wider impact. */
 import { compareChange, computeDay, memberTimeline, optimizeDay, suggest, validatePlan } from '/engine/index.js';
-import { communityRipple, seasonSavings, smogSeasonDaysLeft } from '/engine/impact.js';
-import {
-  renderBudget,
-  renderHourGrid,
-  renderRipple,
-  renderSeason,
-  renderStats,
-  renderSuggestions,
-} from './budget-view.js';
-import { byId, h } from './dom.js';
+import { seasonSavings, smogSeasonDaysLeft } from '/engine/impact.js';
+import { renderBudget, renderHourGrid, renderSeason, renderStats, renderSuggestions } from './budget-view.js';
+import { byId } from './dom.js';
+import { initRipplePanel } from './ripple-panel.js';
 import { replacePlan, restoreOriginal, state, subscribe, validInputs } from './state.js';
 
 /** @typedef {import('./types.js').DayResult} DayResult */
@@ -19,7 +13,6 @@ import { replacePlan, restoreOriginal, state, subscribe, validInputs } from './s
 /** Wait this long after an edit before recalculating, so typing stays smooth. */
 const RECALC_DELAY_MS = 120;
 const MAX_SUGGESTIONS = 6;
-const MAX_FAMILIES = 100_000;
 
 /**
  * Wire up the budget section.
@@ -29,10 +22,7 @@ export function initBudgetPanel() {
   const status = byId('results-status');
   const heading = byId('budget-h');
   const undo = byId('undo-all');
-  const families = /** @type {HTMLInputElement} */ (byId('families'));
-  const rippleOut = byId('ripple-out');
-  /** @type {{ baseline: DayResult, smarter: DayResult } | null} */
-  let impact = null;
+  const ripple = initRipplePanel();
   let timer = 0;
 
   /**
@@ -43,16 +33,6 @@ export function initBudgetPanel() {
     status.textContent = text;
     status.classList.toggle('error', isError);
   };
-
-  function updateRipple() {
-    if (!impact) return;
-    const n = Number(families.value);
-    if (!(n >= 1 && n <= MAX_FAMILIES)) {
-      rippleOut.replaceChildren(h('p', { class: 'error' }, 'Enter between 1 and 100,000 families.'));
-      return;
-    }
-    renderRipple(rippleOut, communityRipple(impact.baseline, impact.smarter, n));
-  }
 
   function render() {
     undo.hidden = !state.original;
@@ -72,11 +52,10 @@ export function initBudgetPanel() {
     // even after some changes have been applied.
     const original = state.original ? validatePlan(state.original) : null;
     const baseline = original?.ok ? computeDay(original.plan, pm) : day;
-    impact = { baseline, smarter };
 
     renderStats(byId('stats'), day, smarter);
     renderSeason(byId('season-out'), plan, seasonSavings(baseline, smarter, smogSeasonDaysLeft(new Date())));
-    updateRipple();
+    ripple.show(baseline, smarter);
     renderHourGrid(byId('hour-grid'), plan, pm, memberTimeline);
     renderBudget(byId('budget'), plan, day);
     renderSuggestions(byId('suggestions'), suggest(plan, pm).slice(0, MAX_SUGGESTIONS), apply);
@@ -120,7 +99,6 @@ export function initBudgetPanel() {
     if (restoreOriginal()) heading.focus();
   });
 
-  families.addEventListener('input', updateRipple);
   render();
   return { apply };
 }

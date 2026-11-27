@@ -51,126 +51,153 @@ export async function shrinkPhoto(file) {
   return { blob, base64: dataUrl.slice(dataUrl.indexOf(',') + 1) };
 }
 
+/** Elements of this section, found once when it starts. */
+function findElements() {
+  return {
+    fileInput: /** @type {HTMLInputElement} */ (byId('scan-file')),
+    preview: /** @type {HTMLImageElement} */ (byId('scan-preview')),
+    status: byId('scan-status'),
+    out: byId('scan-out'),
+    checklist: byId('checklist'),
+    scanBtn: /** @type {HTMLButtonElement} */ (byId('scan-btn')),
+  };
+}
+
+/** @type {ReturnType<typeof findElements>} */
+let ui;
+/** @type {(request: ChangeRequest) => void} */
+let applyChange = () => {};
+
+/**
+ * @param {string} text
+ * @param {boolean} [error]
+ */
+function say(text, error = false) {
+  ui.status.textContent = text;
+  ui.status.classList.toggle('error', error);
+}
+
+/** @param {string} text */
+const hint = (text) => h('span', { class: 'hint' }, text);
+
+/**
+ * One fix card: what was seen, the fix, and (when the plan allows) its real impact.
+ * @param {ReturnType<typeof findingsToFixes>[number]} fix
+ * @param {import('./types.js').Plan} plan
+ * @param {string | undefined} seen
+ */
+function fixCard(fix, plan, seen) {
+  const { change } = fix;
+  const forecast = state.forecast;
+  const result = change && forecast ? compareChange(plan, forecast, change) : null;
+  const usable = result?.ok ? result : null;
+  const useButton =
+    usable && change
+      ? h(
+          'button',
+          { type: 'button', class: 'btn', onclick: () => applyChange({ change, title: usable.description }) },
+          'Use this in my day',
+        )
+      : null;
+  return h(
+    'li',
+    null,
+    h('strong', null, fix.label),
+    seen ? h('span', { class: 'evidence' }, `Seen: ${seen}`) : null,
+    h('span', null, fix.advice),
+    usable ? impactChips(usable.delta) : null,
+    fix.note ? hint(fix.note) : null,
+    change && !forecast ? hint('Load a forecast in step 01 to see the impact.') : null,
+    useButton ? h('div', null, useButton) : null,
+  );
+}
+
+/**
+ * Show a card per finding.
+ * @param {FindingId[]} ids
+ * @param {Partial<Record<FindingId, string>>} [evidence]
+ */
+function showFixes(ids, evidence = {}) {
+  const checked = validatePlan(state.plan);
+  if (!checked.ok) return say('Fix your family plan above first.', true);
+  const fixes = findingsToFixes(ids, checked.plan);
+  if (!fixes.length) {
+    ui.out.replaceChildren(h('p', { class: 'hint' }, 'Nothing to fix was found. Nice work keeping indoor air clean.'));
+    return;
+  }
+  ui.out.replaceChildren(h('ul', { class: 'fixes' }, ...fixes.map((f) => fixCard(f, checked.plan, evidence[f.id]))));
+}
+
+/** @returns {NodeListOf<HTMLInputElement>} */
+const checklistBoxes = () => ui.checklist.querySelectorAll('input');
+
+function onChecklistSubmit() {
+  const ids = [...checklistBoxes()]
+    .filter((box) => box.checked)
+    .map((box) => box.value)
+    .filter(isFindingId);
+  if (!ids.length) return say('Tick at least one item.', true);
+  say(`Showing fixes for ${ids.length} item${ids.length > 1 ? 's' : ''}.`);
+  showFixes(ids);
+}
+
+/**
+ * Shrink the photo, show it, and ask Gemini what it sees. The checklist is ticked to match.
+ * @param {File} file
+ */
+async function scanFile(file) {
+  say('Shrinking the photo on your device…');
+  const { blob, base64 } = await shrinkPhoto(file);
+  if (ui.preview.src) URL.revokeObjectURL(ui.preview.src);
+  ui.preview.src = URL.createObjectURL(blob);
+  ui.preview.hidden = false;
+  say('Gemini is looking for smoke sources…');
+  /** @type {ScanResult} */
+  const result = await scanPhoto(base64, 'image/jpeg');
+  const ids = result.findings.map((f) => f.id);
+  for (const box of checklistBoxes()) box.checked = isFindingId(box.value) && ids.includes(box.value);
+  say(result.summary || `Found ${ids.length} item${ids.length === 1 ? '' : 's'}.`);
+  if (!ids.length) {
+    const tip =
+      'Nothing to act on in this photo. Try a wider shot of the kitchen, bedroom or puja corner, or tick the checklist above.';
+    ui.out.replaceChildren(h('p', { class: 'hint' }, tip));
+    return;
+  }
+  showFixes(ids, Object.fromEntries(result.findings.map((f) => [f.id, f.evidence])));
+}
+
+async function onScanSubmit() {
+  const file = ui.fileInput.files?.[0];
+  if (!file) return say('Choose a photo first.', true);
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return say('Use a JPEG, PNG or WebP photo.', true);
+  ui.scanBtn.disabled = true;
+  try {
+    await scanFile(file);
+  } catch (err) {
+    say(`${/** @type {Error} */ (err).message} You can use the checklist below instead.`, true);
+  } finally {
+    ui.scanBtn.disabled = false;
+  }
+}
+
 /**
  * Wire up the Smoke Detective section.
  * @param {{ apply: (request: ChangeRequest) => void }} deps
  */
 export function initScan({ apply }) {
-  const fileInput = /** @type {HTMLInputElement} */ (byId('scan-file'));
-  const preview = /** @type {HTMLImageElement} */ (byId('scan-preview'));
-  const status = byId('scan-status');
-  const out = byId('scan-out');
-  const checklist = byId('checklist');
-  const scanBtn = /** @type {HTMLButtonElement} */ (byId('scan-btn'));
-
-  checklist.replaceChildren(
+  ui = findElements();
+  applyChange = apply;
+  ui.checklist.replaceChildren(
     ...Object.entries(FINDINGS).map(([id, f]) =>
       h('label', { class: 'check' }, h('input', { type: 'checkbox', value: id, name: 'finding' }), f.label),
     ),
   );
-
-  /**
-   * @param {string} text
-   * @param {boolean} [error]
-   */
-  const say = (text, error = false) => {
-    status.textContent = text;
-    status.classList.toggle('error', error);
-  };
-
-  /**
-   * Show a card per finding: what was seen, the fix, and (when the plan allows) its impact.
-   * @param {FindingId[]} ids
-   * @param {Partial<Record<FindingId, string>>} [evidence]
-   */
-  function showFixes(ids, evidence = {}) {
-    const checked = validatePlan(state.plan);
-    if (!checked.ok) return say('Fix your family plan above first.', true);
-    const forecast = state.forecast;
-    const fixes = findingsToFixes(ids, checked.plan);
-    if (!fixes.length) {
-      out.replaceChildren(h('p', { class: 'hint' }, 'Nothing to fix was found. Nice work keeping indoor air clean.'));
-      return;
-    }
-    out.replaceChildren(
-      h(
-        'ul',
-        { class: 'fixes' },
-        ...fixes.map((f) => {
-          const { change } = f;
-          const result = change && forecast ? compareChange(checked.plan, forecast, change) : null;
-          const usable = result?.ok ? result : null;
-          return h(
-            'li',
-            null,
-            h('strong', null, f.label),
-            evidence[f.id] ? h('span', { class: 'evidence' }, `Seen: ${evidence[f.id]}`) : null,
-            h('span', null, f.advice),
-            usable ? impactChips(usable.delta) : null,
-            f.note ? h('span', { class: 'hint' }, f.note) : null,
-            change && !forecast ? h('span', { class: 'hint' }, 'Load a forecast in step 01 to see the impact.') : null,
-            usable && change
-              ? h(
-                  'div',
-                  null,
-                  h(
-                    'button',
-                    { type: 'button', class: 'btn', onclick: () => apply({ change, title: usable.description }) },
-                    'Use this in my day',
-                  ),
-                )
-              : null,
-          );
-        }),
-      ),
-    );
-  }
-
   byId('checklist-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const ids = [.../** @type {NodeListOf<HTMLInputElement>} */ (checklist.querySelectorAll('input:checked'))]
-      .map((i) => i.value)
-      .filter(isFindingId);
-    if (!ids.length) return say('Tick at least one item.', true);
-    say(`Showing fixes for ${ids.length} item${ids.length > 1 ? 's' : ''}.`);
-    showFixes(ids);
+    onChecklistSubmit();
   });
-
-  byId('scan-form').addEventListener('submit', async (e) => {
+  byId('scan-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const file = fileInput.files?.[0];
-    if (!file) return say('Choose a photo first.', true);
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return say('Use a JPEG, PNG or WebP photo.', true);
-    scanBtn.disabled = true;
-    try {
-      say('Shrinking the photo on your device…');
-      const { blob, base64 } = await shrinkPhoto(file);
-      if (preview.src) URL.revokeObjectURL(preview.src);
-      preview.src = URL.createObjectURL(blob);
-      preview.hidden = false;
-      say('Gemini is looking for smoke sources…');
-      /** @type {ScanResult} */
-      const r = await scanPhoto(base64, 'image/jpeg');
-      const ids = r.findings.map((f) => f.id);
-      for (const input of /** @type {NodeListOf<HTMLInputElement>} */ (checklist.querySelectorAll('input'))) {
-        input.checked = isFindingId(input.value) && ids.includes(input.value);
-      }
-      say(r.summary || `Found ${ids.length} item${ids.length === 1 ? '' : 's'}.`);
-      if (!ids.length) {
-        out.replaceChildren(
-          h(
-            'p',
-            { class: 'hint' },
-            'Nothing to act on in this photo. Try a wider shot of the kitchen, bedroom or puja corner, or tick the checklist above.',
-          ),
-        );
-        return;
-      }
-      showFixes(ids, Object.fromEntries(r.findings.map((f) => [f.id, f.evidence])));
-    } catch (err) {
-      say(`${/** @type {Error} */ (err).message} You can use the checklist below instead.`, true);
-    } finally {
-      scanBtn.disabled = false;
-    }
+    onScanSubmit();
   });
 }

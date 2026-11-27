@@ -38,14 +38,10 @@ function score(r) {
 
 /**
  * Turn a comparison into a suggestion.
- * @param {Suggestion['type']} type
- * @param {Change} change
- * @param {import('./scenario.js').Comparison} r
- * @param {string} why
- * @param {boolean} [costly]
+ * @param {{ type: Suggestion['type'], change: Change, r: import('./scenario.js').Comparison, why: string, costly?: boolean }} parts
  * @returns {Suggestion}
  */
-function toSuggestion(type, change, r, why, costly = false) {
+function toSuggestion({ type, change, r, why, costly = false }) {
   const d = r.delta;
   return {
     id: `${type}:${change.activityId ?? 'home'}`,
@@ -130,7 +126,7 @@ export function suggest(plan, pm) {
    */
   const push = (type, found, why, costly) => {
     if (!found || !found.r.ok || score(found.r) < MIN_GAIN_PCT) return;
-    out.push(toSuggestion(type, found.change, found.r, why, costly));
+    out.push(toSuggestion({ type, change: found.change, r: found.r, why, costly }));
   };
 
   for (const a of plan.activities) {

@@ -33,76 +33,114 @@ export function applyChange(plan, change) {
   return next;
 }
 
+/** @typedef {import('./dose.js').Plan} Plan */
+/** @typedef {import('./dose.js').Activity} Activity */
+
+/**
+ * Problems with a new transport mode for a trip.
+ * @param {Plan} plan
+ * @param {Activity} a
+ * @param {keyof typeof MODES} modeId
+ * @returns {string[]}
+ */
+function modeProblems(plan, a, modeId) {
+  if (a.kind !== 'commute') return [`"${a.label}" is not a trip, so it has no transport mode.`];
+  const mode = MODES[modeId];
+  if (!mode) return ['Unknown transport mode.'];
+  const problems = [];
+  if ((a.distanceKm ?? 0) > mode.maxKm) problems.push(`${a.distanceKm} km is too far to ${mode.label.toLowerCase()}.`);
+  if (modeId === 'metro' && !plan.home.metro) problems.push('You told us there is no metro near you.');
+  if (modeId === 'bus' && !plan.home.bus) problems.push('You told us there is no bus near you.');
+  return problems;
+}
+
+/**
+ * True when the change would leave the activity exactly as planned.
+ * @param {Activity} a
+ * @param {Change} change
+ */
+function changesNothing(a, change) {
+  return (
+    (change.start === undefined || Math.abs(change.start - a.start) < 1e-9) &&
+    (change.mode === undefined || change.mode === a.mode) &&
+    (change.source === undefined || change.source === a.source)
+  );
+}
+
+/**
+ * Problems with where the moved activity lands: past midnight, clashes, sleeping hours.
+ * @param {Plan} plan
+ * @param {Activity} moved
+ * @param {boolean} timeChanged
+ * @returns {string[]}
+ */
+function timingProblems(plan, moved, timeChanged) {
+  const hours = activityHours(moved);
+  if (moved.start < 0 || moved.start + hours > 24) return ['The new time runs past midnight.'];
+  const slot = { start: moved.start, hours };
+  const clash = plan.activities.find(
+    (o) =>
+      o.id !== moved.id &&
+      o.memberIds.some((id) => moved.memberIds.includes(id)) &&
+      overlaps(slot, { start: o.start, hours: activityHours(o) }),
+  );
+  const problems = clash ? [`It would clash with "${clash.label}" at ${formatTime(clash.start)}.`] : [];
+  const sleep = plan.sleep ?? DEFAULT_SLEEP;
+  const asleep =
+    isSleepHour(Math.floor(moved.start), sleep) || isSleepHour(Math.floor(moved.start + hours - 1e-6), sleep);
+  if (timeChanged && moved.kind !== 'home' && asleep) problems.push('That time is during sleeping hours.');
+  return problems;
+}
+
 /**
  * Reasons a change cannot be made, in plain words. Empty means it is feasible.
- * @param {import('./dose.js').Plan} plan
+ * @param {Plan} plan
  * @param {Change} change
  * @returns {string[]}
  */
 export function checkChange(plan, change) {
-  const errors = [];
-  const hasHome = change.windows !== undefined || change.purifier !== undefined;
-  if (!change.activityId && !hasHome) errors.push('The change does not say what to change.');
-  if (!change.activityId) return errors;
-
+  const touchesHome = change.windows !== undefined || change.purifier !== undefined;
+  if (!change.activityId) return touchesHome ? [] : ['The change does not say what to change.'];
   const a = plan.activities.find((x) => x.id === change.activityId);
   if (!a) return ['That activity is not in your plan.'];
-  if (change.mode) {
-    if (a.kind !== 'commute') errors.push(`"${a.label}" is not a trip, so it has no transport mode.`);
-    else if (!MODES[change.mode]) errors.push('Unknown transport mode.');
-    else {
-      const mode = MODES[change.mode];
-      if ((a.distanceKm ?? 0) > mode.maxKm)
-        errors.push(`${a.distanceKm} km is too far to ${mode.label.toLowerCase()}.`);
-      if (change.mode === 'metro' && !plan.home.metro) errors.push('You told us there is no metro near you.');
-      if (change.mode === 'bus' && !plan.home.bus) errors.push('You told us there is no bus near you.');
-    }
-  }
-  if (change.source && a.kind !== 'home') errors.push(`"${a.label}" is not at home, so it has no smoke source.`);
-  const same =
-    (change.start === undefined || Math.abs(change.start - a.start) < 1e-9) &&
-    (change.mode === undefined || change.mode === a.mode) &&
-    (change.source === undefined || change.source === a.source) &&
-    !hasHome;
-  if (same) errors.push(`That is already how "${a.label}" is planned.`);
-  if (errors.length) return errors;
 
-  const moved = applyChange(plan, change).activities.find((x) => x.id === a.id);
-  if (!moved) return errors;
-  const hours = activityHours(moved);
-  if (moved.start < 0 || moved.start + hours > 24) return ['The new time runs past midnight.'];
-  const others = plan.activities.filter((o) => o.id !== a.id && o.memberIds.some((id) => moved.memberIds.includes(id)));
-  const clash = others.find((o) =>
-    overlaps({ start: moved.start, hours }, { start: o.start, hours: activityHours(o) }),
-  );
-  if (clash) errors.push(`It would clash with "${clash.label}" at ${formatTime(clash.start)}.`);
-  if (typeof change.start === 'number' && moved.kind !== 'home') {
-    const sleep = plan.sleep ?? DEFAULT_SLEEP;
-    if (isSleepHour(Math.floor(moved.start), sleep) || isSleepHour(Math.floor(moved.start + hours - 1e-6), sleep)) {
-      errors.push('That time is during sleeping hours.');
-    }
-  }
-  return errors;
+  const problems = change.mode ? modeProblems(plan, a, change.mode) : [];
+  if (change.source && a.kind !== 'home') problems.push(`"${a.label}" is not at home, so it has no smoke source.`);
+  if (!touchesHome && changesNothing(a, change)) problems.push(`That is already how "${a.label}" is planned.`);
+  if (problems.length) return problems;
+
+  const moved = /** @type {Activity} */ (applyChange(plan, change).activities.find((x) => x.id === a.id));
+  return timingProblems(plan, moved, typeof change.start === 'number');
 }
 
 /**
- * Plain-language description of a change, e.g. 'Move "Cricket" to 2:00 PM'.
- * @param {import('./dose.js').Plan} plan
+ * Plain-language description of a change, e.g. 'Move "Cricket" from 5:00 PM to 2:00 PM'.
+ * @param {Plan} plan
  * @param {Change} change
  */
 export function describeChange(plan, change) {
   const a = change.activityId ? plan.activities.find((x) => x.id === change.activityId) : undefined;
-  const parts = [];
-  if (a && change.mode)
-    parts.push(`Go by ${MODES[change.mode].label} instead of ${MODES[a.mode ?? 'bus'].label} for "${a.label}"`);
-  if (a && typeof change.start === 'number')
-    parts.push(`Move "${a.label}" from ${formatTime(a.start)} to ${formatTime(change.start)}`);
-  if (a && change.source) parts.push(`"${a.label}": ${SOURCES[change.source].label.toLowerCase()}`);
+  const parts = a ? describeActivityChange(a, change) : [];
   if (change.windows)
     parts.push(change.windows === 'closed' ? 'Keep windows shut at home' : 'Open the windows at home');
-  if (change.purifier === true) parts.push('Run an air purifier at home');
-  if (change.purifier === false) parts.push('Turn off the air purifier');
+  if (change.purifier !== undefined)
+    parts.push(change.purifier ? 'Run an air purifier at home' : 'Turn off the air purifier');
   return parts.join('; ');
+}
+
+/**
+ * @param {Activity} a
+ * @param {Change} change
+ * @returns {string[]}
+ */
+function describeActivityChange(a, change) {
+  const parts = [];
+  if (change.mode)
+    parts.push(`Go by ${MODES[change.mode].label} instead of ${MODES[a.mode ?? 'bus'].label} for "${a.label}"`);
+  if (typeof change.start === 'number')
+    parts.push(`Move "${a.label}" from ${formatTime(a.start)} to ${formatTime(change.start)}`);
+  if (change.source) parts.push(`"${a.label}": ${SOURCES[change.source].label.toLowerCase()}`);
+  return parts;
 }
 
 /**

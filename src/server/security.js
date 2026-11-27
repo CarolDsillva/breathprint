@@ -6,26 +6,53 @@ import { rateLimit } from 'express-rate-limit';
 const ONE_MINUTE_MS = 60_000;
 
 /**
- * Helmet with a strict Content-Security-Policy: scripts and styles only from this origin
- * (fonts from Google Fonts), no inline code, no framing.
+ * Browser features the page may use. Location (to find your city) and the camera (for room
+ * photos) are allowed for this site only; everything else is switched off.
+ */
+export const PERMISSIONS_POLICY = [
+  'geolocation=(self)',
+  'camera=(self)',
+  'microphone=()',
+  'payment=()',
+  'usb=()',
+  'serial=()',
+  'bluetooth=()',
+  'hid=()',
+  'midi=()',
+  'display-capture=()',
+  'fullscreen=(self)',
+].join(', ');
+
+/**
+ * Helmet with a strict Content-Security-Policy: everything (scripts, styles, fonts, data)
+ * from this origin only, no inline code, no framing. Plus a Permissions-Policy.
+ * @returns {import('express').RequestHandler[]}
  */
 export function securityHeaders() {
-  return helmet({
-    contentSecurityPolicy: {
-      useDefaults: true,
-      directives: {
-        'default-src': ["'self'"],
-        'script-src': ["'self'"],
-        'style-src': ["'self'", 'https://fonts.googleapis.com'],
-        'font-src': ["'self'", 'https://fonts.gstatic.com'],
-        'img-src': ["'self'", 'data:', 'blob:'],
-        'connect-src': ["'self'"],
-        'object-src': ["'none'"],
-        'frame-ancestors': ["'none'"],
+  return [
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          'default-src': ["'self'"],
+          'script-src': ["'self'"],
+          'style-src': ["'self'"],
+          'font-src': ["'self'"],
+          'img-src': ["'self'", 'data:', 'blob:'],
+          'connect-src': ["'self'"],
+          'object-src': ["'none'"],
+          'frame-ancestors': ["'none'"],
+          'base-uri': ["'self'"],
+          'form-action': ["'self'"],
+        },
       },
+      crossOriginEmbedderPolicy: false,
+    }),
+    (_req, res, next) => {
+      res.setHeader('Permissions-Policy', PERMISSIONS_POLICY);
+      next();
     },
-    crossOriginEmbedderPolicy: false,
-  });
+  ];
 }
 
 /**

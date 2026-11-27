@@ -6,12 +6,14 @@
  * must be fresh, and they may contain the family's plan.
  */
 const sw = /** @type {ServiceWorkerGlobalScope} */ (/** @type {unknown} */ (self));
-const CACHE = 'breathprint-v2';
+const CACHE = 'breathprint-v3';
 const SHELL = [
   '/',
   '/styles.css',
   '/manifest.webmanifest',
   '/icon.svg',
+  '/fonts/Geist-Variable.woff2',
+  '/fonts/GeistMono-Variable.woff2',
   '/js/app.js',
   '/js/api.js',
   '/js/dom.js',
@@ -19,10 +21,13 @@ const SHELL = [
   '/js/state.js',
   '/js/components.js',
   '/js/editor.js',
+  '/js/editor-cards.js',
+  '/js/editor-fields.js',
   '/js/home-settings.js',
   '/js/forecast-panel.js',
   '/js/budget-view.js',
   '/js/budget-panel.js',
+  '/js/ripple-panel.js',
   '/js/briefing-panel.js',
   '/js/whatif-panel.js',
   '/js/room-panel.js',

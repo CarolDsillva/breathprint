@@ -71,8 +71,8 @@ Most air-quality apps show a city AQI number and generic advice ("wear a mask").
 npm install
 cp .env.example .env        # optional: add GEMINI_API_KEY for AI briefings
 npm start                   # http://localhost:8080
-npm test                    # 72 tests, no network needed
-npm run coverage            # ~99% line coverage
+npm test                    # 103 tests, no network needed
+npm run coverage            # ~96% of lines, browser code included
 npm run check               # Prettier + ESLint + strict TypeScript check (JSDoc) + tests
 ```
 
@@ -82,11 +82,11 @@ Without a Gemini key the app still works fully: briefings use a deterministic te
 
 ## Quality, security, efficiency, accessibility
 
-- **Code quality:** small single-purpose modules (one per UI panel, one per AI feature, separate routes and security config). Shared types come from the engine. A strict TypeScript check (`strict`, `noImplicitAny`) runs over the JSDoc types in server, engine and browser code, with **no `any`**: untrusted JSON is typed as `unknown` and narrowed with type guards. Also ESLint (recommended rules plus `eqeqeq`, `no-eval` and others), Prettier and EditorConfig. Both run in **GitHub Actions CI** on Node 22 and 24 (the supported LTS lines) with tests, coverage and `npm audit`.
-- **Testing:** `node:test`, 72 tests, about 99% line coverage. They cover the dose maths against hand calculations, linearity, emissions, feasibility rules, the optimiser, the parsers, validation and injection stripping, plus HTTP tests for headers, caching, rate limits, fallbacks, error handling and key handling (Gemini and Open-Meteo are stubbed). Also tested: the photo checks (fake signatures, oversized files), the scan route, season and neighbourhood maths, the offline file list, and an automated **axe-core WCAG 2.1 AA audit** of the page.
-- **Security:** API key only on the server, sent in a header (never in a URL); Helmet with a strict Content-Security-Policy (no inline scripts or styles); JSON body limit 32 KB; rate limits (120/min, 15/min for AI routes); strict allow-list validation of every input; model output treated as untrusted and re-validated (prompts mark user text and photo text as data, not instructions); photos are checked by magic bytes and never stored; all text rendered with `textContent` (no `innerHTML`); upstream errors hidden behind friendly messages; non-root Docker image.
+- **Code quality:** small single-purpose modules (one per UI panel, one per AI feature, separate routes and security config). ESLint enforces the limits: complexity ≤ 15, ≤ 80 lines per function, ≤ 300 per file, ≤ 4 parameters. Lookup tables replace long `if` chains. Shared types come from the engine. A strict TypeScript check (`strict`, `noImplicitAny`) runs over the JSDoc types in server, engine and browser code with **no `any`**: untrusted JSON is typed as `unknown` and narrowed with type guards. Prettier and EditorConfig keep formatting consistent. All of this runs in **GitHub Actions CI** on Node 22 and 24, with tests, coverage and `npm audit`.
+- **Testing:** `node:test`, 103 tests, about 96% line coverage across engine, server **and browser code**. Engine: the dose maths against hand calculations, linearity, emissions, feasibility rules, the optimiser, parsers, validation and injection stripping. Server: HTTP tests for security headers, caching, rate limits, fallbacks, error handling and key handling (Gemini and Open-Meteo are stubbed), plus the photo checks and scan route. Browser: editor field rules, state and undo, DOM helpers, announcements and the API client, run in jsdom. Accessibility: two **axe-core WCAG 2.1 AA audits**, one of the empty page and one with real results, editor forms and a comparison table rendered.
+- **Security:** see [SECURITY.md](SECURITY.md). In short: the API key stays on the server, sent in a header (never in a URL). A strict Content-Security-Policy allows **this origin only**, with self-hosted fonts and no third-party requests. A Permissions-Policy allows only location and camera. Helmet sets HSTS, `nosniff` and `no-referrer`. Body limits are 32 KB, or 1.6 MB for photos only. Rate limits are 120/min and 15/min for AI. Every input is checked against allow-lists. Model output is treated as untrusted and re-validated, and prompts mark user and photo text as data. Photos are checked by magic bytes and never stored. All text is rendered with `textContent`. Upstream errors are hidden, and the Docker image runs as non-root.
 - **Efficiency:** photos are resized on the device before upload; the service worker serves the app shell offline; the engine runs in the browser (instant recalculation, no server round-trip); forecasts cached per grid cell with in-flight de-duplication; identical briefing requests cached for 10 minutes; 3 runtime dependencies, no front-end build, the repo is a few hundred KB.
-- **Accessibility:** semantic landmarks, skip link, every input labelled, `fieldset`/`legend` groups, live regions for results, focus moved to results after big changes, colour never used alone (every band and chip has words, ↑/↓ arrows and patterns), text descriptions for the charts, keyboard-only use, 40 px+ targets, `prefers-reduced-motion`, Hindi output with `lang` set, text contrast of at least 4.5:1 everywhere, a photo-free checklist alternative to Smoke Detective, and the axe-core audit in CI.
+- **Accessibility:** semantic landmarks, skip link, every input labelled, `fieldset`/`legend` groups. Short spoken summaries replace whole live regions ("Comparison ready: family breathes 3.8% less"), and focus moves to results after big changes. Colour is never used alone: every band and chip has words, ↑/↓ arrows and patterns. Charts have text descriptions. It works keyboard-only, with 40 px+ targets and `prefers-reduced-motion`. Dark **and light themes** follow the system setting, with text contrast of at least 4.5:1 in both. Hindi output has `lang` set, and Smoke Detective has a photo-free checklist alternative. axe-core audits run in CI.
 
 ## Assumptions and limits
 
@@ -106,10 +106,10 @@ src/engine/    pure model: dose, emissions, scenarios, optimiser, room, impact (
                scan (Smoke Detective rules), intent, validation, sample data
 src/server/    app.js (composition), security.js (headers, rate limits), routes/ (air, ai), ai/ (briefing,
                whatif, roomScan, prompts), services/ (Open-Meteo, Gemini), cache, image checks
-public/js/     app.js wires one module per section: forecast-panel, editor, home-settings, budget-panel
-               (+ budget-view), briefing-panel, whatif-panel, room-panel, scan; shared state.js,
-               components.js, types.js, dom.js, api.js
-public/        index.html, styles.css, manifest and service worker
-test/          node:test suites (engine, inputs, server, features, a11y)
+public/js/     app.js wires one module per section: forecast-panel, editor (+ editor-cards, editor-fields),
+               home-settings, budget-panel (+ budget-view, ripple-panel), briefing-panel, whatif-panel,
+               room-panel, scan; shared state.js, components.js, types.js, dom.js, api.js
+public/        index.html, styles.css, self-hosted fonts (OFL), manifest and service worker
+test/          engine, inputs, server, features, browser-logic, a11y and a11y-results suites
 .github/       CI workflow
 ```

@@ -53,124 +53,135 @@ export function renderAirStrip(el, pm) {
   );
 }
 
-/** Wire up place search, geolocation, the sample day and the day picker. */
-export function initForecastPanel() {
-  const form = /** @type {HTMLFormElement} */ (byId('place-form'));
-  const input = /** @type {HTMLInputElement} */ (byId('place-input'));
-  const results = byId('place-results');
-  const daySelect = /** @type {HTMLSelectElement} */ (byId('day-select'));
-  const status = byId('air-status');
-  const strip = byId('air-strip');
-  const placeChip = byId('place-chip');
-
-  /**
-   * @param {string} text
-   * @param {boolean} [isError]
-   */
-  const say = (text, isError = false) => {
-    status.textContent = text;
-    status.classList.toggle('error', isError);
+/** Elements of this section, found once when the panel starts. */
+function findElements() {
+  return {
+    form: /** @type {HTMLFormElement} */ (byId('place-form')),
+    input: /** @type {HTMLInputElement} */ (byId('place-input')),
+    results: byId('place-results'),
+    daySelect: /** @type {HTMLSelectElement} */ (byId('day-select')),
+    status: byId('air-status'),
+    strip: byId('air-strip'),
+    placeChip: byId('place-chip'),
   };
+}
 
-  function selectDay() {
-    const day = state.days[Number(daySelect.value)] ?? state.days[0];
-    const known = /** @type {number[]} */ (day.pm25.filter((v) => v !== null));
-    say(
-      `${state.place}, ${day.date}: PM2.5 from ${Math.round(Math.min(...known))} to ${Math.round(Math.max(...known))} µg/m³.`,
-    );
-    renderAirStrip(strip, day.pm25);
-    setForecast(day.pm25);
+/** @type {ReturnType<typeof findElements>} */
+let ui;
+
+/**
+ * @param {string} text
+ * @param {boolean} [isError]
+ */
+function say(text, isError = false) {
+  ui.status.textContent = text;
+  ui.status.classList.toggle('error', isError);
+}
+
+/** Show the chosen day's forecast and hand it to the rest of the app. */
+function selectDay() {
+  const day = state.days[Number(ui.daySelect.value)] ?? state.days[0];
+  const known = /** @type {number[]} */ (day.pm25.filter((v) => v !== null));
+  say(
+    `${state.place}, ${day.date}: PM2.5 from ${Math.round(Math.min(...known))} to ${Math.round(Math.max(...known))} µg/m³.`,
+  );
+  renderAirStrip(ui.strip, day.pm25);
+  setForecast(day.pm25);
+}
+
+/** @param {number} i @param {ForecastDay} day */
+const dayLabel = (i, day) => `${i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : day.date} (${day.date})`;
+
+/**
+ * Offer the forecast days that have enough data. After 6 PM, default to planning tomorrow.
+ * @param {ForecastDay[]} days
+ * @param {string} place
+ */
+function useDays(days, place) {
+  state.days = days.filter((d) => d.pm25.filter((v) => v !== null).length >= MIN_HOURS);
+  state.place = place;
+  ui.placeChip.textContent = `◉ ${place}`;
+  ui.placeChip.hidden = false;
+  ui.daySelect.replaceChildren(...state.days.map((d, i) => h('option', { value: String(i) }, dayLabel(i, d))));
+  ui.daySelect.disabled = state.days.length < 2;
+  if (!state.days.length) return say(`No usable forecast for ${place}. Try a nearby city or the sample day.`, true);
+  ui.daySelect.value = state.days.length > 1 && new Date().getHours() >= PLAN_TOMORROW_FROM ? '1' : '0';
+  selectDay();
+}
+
+/**
+ * @param {number} lat
+ * @param {number} lon
+ * @param {string} label
+ */
+async function loadForecast(lat, lon, label) {
+  say(`Loading the smog forecast for ${label}…`);
+  try {
+    const forecast = await getForecast(lat, lon);
+    useDays(forecast.days, label);
+  } catch (err) {
+    say(/** @type {Error} */ (err).message, true);
   }
+}
 
-  /**
-   * @param {ForecastDay[]} days
-   * @param {string} place
-   */
-  function useDays(days, place) {
-    state.days = days.filter((d) => d.pm25.filter((v) => v !== null).length >= MIN_HOURS);
-    state.place = place;
-    placeChip.textContent = `◉ ${place}`;
-    placeChip.hidden = false;
-    daySelect.replaceChildren(
-      ...state.days.map((d, i) =>
-        h('option', { value: String(i) }, `${i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.date} (${d.date})`),
+/** @param {Place} place */
+function pickPlace(place) {
+  ui.results.replaceChildren();
+  loadForecast(place.lat, place.lon, [place.name, place.region].filter(Boolean).join(', '));
+}
+
+/**
+ * Search for a place; load it directly if there is one match, otherwise let the user choose.
+ * @param {string} query
+ */
+async function searchPlace(query) {
+  say('Searching…');
+  try {
+    /** @type {{ places: Place[] }} */
+    const { places } = await searchPlaces(query);
+    if (!places.length) {
+      ui.results.replaceChildren();
+      return say(`No place called "${query}" found. Check the spelling or try a bigger city nearby.`, true);
+    }
+    if (places.length === 1) return pickPlace(places[0]);
+    say(`Found ${places.length} places. Choose yours.`);
+    const choices = places.map((p) =>
+      h(
+        'button',
+        { type: 'button', class: 'btn', onclick: () => pickPlace(p) },
+        [p.name, p.region, p.country].filter(Boolean).join(', '),
       ),
     );
-    daySelect.disabled = state.days.length < 2;
-    if (!state.days.length) {
-      say(`No usable forecast for ${place}. Try a nearby city or the sample day.`, true);
-      return;
-    }
-    daySelect.value = state.days.length > 1 && new Date().getHours() >= PLAN_TOMORROW_FROM ? '1' : '0';
-    selectDay();
+    ui.results.replaceChildren(...choices);
+    choices[0].focus();
+  } catch (err) {
+    say(/** @type {Error} */ (err).message, true);
   }
+}
 
-  /**
-   * @param {number} lat
-   * @param {number} lon
-   * @param {string} label
-   */
-  async function loadForecast(lat, lon, label) {
-    say(`Loading the smog forecast for ${label}…`);
-    try {
-      const forecast = await getForecast(lat, lon);
-      useDays(forecast.days, label);
-    } catch (err) {
-      say(/** @type {Error} */ (err).message, true);
-    }
-  }
+function useMyLocation() {
+  if (!('geolocation' in navigator))
+    return say('Your browser cannot share location. Search for your city instead.', true);
+  say('Asking your browser for your location…');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => loadForecast(pos.coords.latitude, pos.coords.longitude, 'your location'),
+    () => say('Location was not shared. Search for your city instead.', true),
+    { maximumAge: 600_000, timeout: 10_000 },
+  );
+}
 
-  /** @param {Place} place */
-  function pickPlace(place) {
-    results.replaceChildren();
-    loadForecast(place.lat, place.lon, [place.name, place.region].filter(Boolean).join(', '));
-  }
-
-  form.addEventListener('submit', async (e) => {
+/** Wire up place search, geolocation, the sample day and the day picker. */
+export function initForecastPanel() {
+  ui = findElements();
+  ui.form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const query = input.value.trim();
-    if (query.length < 2) return;
-    say('Searching…');
-    try {
-      /** @type {{ places: Place[] }} */
-      const { places } = await searchPlaces(query);
-      if (!places.length) {
-        results.replaceChildren();
-        say(`No place called "${query}" found. Check the spelling or try a bigger city nearby.`, true);
-        return;
-      }
-      if (places.length === 1) return pickPlace(places[0]);
-      say(`Found ${places.length} places. Choose yours.`);
-      results.replaceChildren(
-        ...places.map((p) =>
-          h(
-            'button',
-            { type: 'button', class: 'btn', onclick: () => pickPlace(p) },
-            [p.name, p.region, p.country].filter(Boolean).join(', '),
-          ),
-        ),
-      );
-      /** @type {HTMLElement | null} */ (results.firstElementChild)?.focus();
-    } catch (err) {
-      say(/** @type {Error} */ (err).message, true);
-    }
+    const query = ui.input.value.trim();
+    if (query.length >= 2) searchPlace(query);
   });
-
-  byId('geo-btn').addEventListener('click', () => {
-    if (!('geolocation' in navigator))
-      return say('Your browser cannot share location. Search for your city instead.', true);
-    say('Asking your browser for your location…');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => loadForecast(pos.coords.latitude, pos.coords.longitude, 'your location'),
-      () => say('Location was not shared. Search for your city instead.', true),
-      { maximumAge: 600_000, timeout: 10_000 },
-    );
-  });
-
+  byId('geo-btn').addEventListener('click', useMyLocation);
   byId('sample-btn').addEventListener('click', () => {
     replacePlan(samplePlan());
     useDays([{ date: 'typical December day', pm25: SAMPLE_FORECAST }], 'Delhi (sample)');
   });
-
-  daySelect.addEventListener('change', selectDay);
+  ui.daySelect.addEventListener('change', selectDay);
 }

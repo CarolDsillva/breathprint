@@ -1,27 +1,39 @@
 // @ts-check
+/** @typedef {Node | string | number | null | undefined | false} Child */
+
+/**
+ * Set one attribute or property on an element.
+ * @param {HTMLElement} el
+ * @param {string} key
+ * @param {unknown} value
+ */
+function setAttr(el, key, value) {
+  if (key === 'class') el.className = String(value);
+  // Via the CSSOM: allowed under our strict Content-Security-Policy, unlike style="" attributes.
+  else if (key === 'style') el.style.cssText = String(value);
+  else if (key === 'dataset') Object.assign(el.dataset, value);
+  // Properties such as `checked`, `disabled` and `onclick` are set directly, not as attributes.
+  else if (key in el && typeof value !== 'string') Reflect.set(el, key, value);
+  else el.setAttribute(key, value === true ? '' : String(value));
+}
+
 /**
  * Tiny element builder. Text is always set with textContent, never parsed as HTML,
- * so user input and AI text cannot inject markup.
+ * so user input and AI text cannot inject markup. Null, undefined and false are skipped,
+ * which keeps conditional attributes and children readable.
  * @param {string} tag
  * @param {Record<string, unknown> | null} [attrs]
- * @param {...(Node | string | number | null | undefined | false)} children
+ * @param {...Child} children
  * @returns {HTMLElement}
  */
 export function h(tag, attrs, ...children) {
   const el = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs ?? {})) {
-    if (value === undefined || value === null || value === false) continue;
-    if (key === 'class') el.className = String(value);
-    // Via the CSSOM: allowed under our strict Content-Security-Policy, unlike style="" attributes.
-    else if (key === 'style') el.style.cssText = String(value);
-    else if (key === 'dataset') Object.assign(el.dataset, value);
-    // Properties such as `checked`, `disabled` and `onclick` are set directly, not as attributes.
-    else if (key in el && typeof value !== 'string') Reflect.set(el, key, value);
-    else el.setAttribute(key, value === true ? '' : String(value));
+    if (value !== undefined && value !== null && value !== false) setAttr(el, key, value);
   }
   for (const child of children) {
-    if (child === null || child === undefined || child === false) continue;
-    el.append(child instanceof Node ? child : String(child));
+    if (child !== undefined && child !== null && child !== false)
+      el.append(child instanceof Node ? child : String(child));
   }
   return el;
 }

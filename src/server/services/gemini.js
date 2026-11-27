@@ -77,58 +77,87 @@ export function createGemini({
      */
     async generateJson({ system, prompt, maxTokens = MIN_OUTPUT_TOKENS, image }) {
       if (!enabled) throw new GeminiError('not-configured');
-      const base = {
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }, ...(image ? [{ inlineData: image }] : [])] }],
-      };
-      const generationConfig = {
-        responseMimeType: 'application/json',
-        maxOutputTokens: Math.max(maxTokens, MIN_OUTPUT_TOKENS),
-      };
       try {
-        const withThinking = {
-          ...base,
-          generationConfig: { ...generationConfig, thinkingConfig: { thinkingLevel: 'low' } },
-        };
-        let res = await call(withThinking);
-        // Model name not available for this key: switch to the backup model for good.
-        if (res.status === 404 && activeModel !== fallbackModel) {
-          logger?.warn(`[gemini] model ${activeModel} not found, using ${fallbackModel}`);
-          activeModel = fallbackModel;
-          res = await call(withThinking);
-        }
-        // Older models reject thinkingConfig: retry once without it.
-        if (res.status === 400) res = await call({ ...base, generationConfig });
-        if (!res.ok) throw new GeminiError(`http-${res.status}`);
-        const body = /** @type {GenerateResponse | null} */ (await res.json());
-        const candidate = body?.candidates?.[0];
-        if (!candidate) throw new GeminiError(body?.promptFeedback?.blockReason ? 'blocked' : 'no-candidate');
-        const text = (candidate.content?.parts ?? [])
-          .filter((part) => !part?.thought)
-          .map((part) => (typeof part?.text === 'string' ? part.text : ''))
-          .join('');
-        if (candidate.finishReason === 'MAX_TOKENS') throw new GeminiError('truncated');
-        let parsed;
-        try {
-          parsed = JSON.parse(stripFences(text));
-        } catch {
-          throw new GeminiError('bad-json');
-        }
+        const res = await send(buildRequest({ system, prompt, maxTokens, image }));
+        const parsed = await readJsonAnswer(res);
         state.lastError = null;
         return parsed;
       } catch (err) {
-        const code =
-          err instanceof GeminiError
-            ? err.code
-            : err instanceof Error && err.name === 'TimeoutError'
-              ? 'timeout'
-              : 'network';
+        const code = failureCode(err);
         state.lastError = code;
         logger?.warn(`[gemini] ${code}`);
         throw err instanceof GeminiError ? err : new GeminiError(code);
       }
     },
   };
+
+  /**
+   * Send a request, recovering from two known problems: a model name this key cannot use
+   * (switch to the backup model for good) and models that reject thinkingConfig (retry once
+   * without it).
+   * @param {ReturnType<typeof buildRequest>} request
+   */
+  async function send(request) {
+    let res = await call(request);
+    if (res.status === 404 && activeModel !== fallbackModel) {
+      logger?.warn(`[gemini] model ${activeModel} not found, using ${fallbackModel}`);
+      activeModel = fallbackModel;
+      res = await call(request);
+    }
+    if (res.status === 400) {
+      const { thinkingConfig: _ignored, ...plainConfig } = request.generationConfig;
+      res = await call({ ...request, generationConfig: plainConfig });
+    }
+    return res;
+  }
+}
+
+/**
+ * The generateContent request body: JSON output, low thinking, room for the answer.
+ * @param {{ system: string, prompt: string, maxTokens: number, image?: { mimeType: string, data: string } }} req
+ */
+function buildRequest({ system, prompt, maxTokens, image }) {
+  return {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: 'user', parts: [{ text: prompt }, ...(image ? [{ inlineData: image }] : [])] }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      maxOutputTokens: Math.max(maxTokens, MIN_OUTPUT_TOKENS),
+      thinkingConfig: { thinkingLevel: 'low' },
+    },
+  };
+}
+
+/**
+ * Read the model's JSON answer, or throw a GeminiError saying why it is unusable.
+ * @param {Response} res
+ * @returns {Promise<unknown>}
+ */
+async function readJsonAnswer(res) {
+  if (!res.ok) throw new GeminiError(`http-${res.status}`);
+  const body = /** @type {GenerateResponse | null} */ (await res.json());
+  const candidate = body?.candidates?.[0];
+  if (!candidate) throw new GeminiError(body?.promptFeedback?.blockReason ? 'blocked' : 'no-candidate');
+  if (candidate.finishReason === 'MAX_TOKENS') throw new GeminiError('truncated');
+  const text = (candidate.content?.parts ?? [])
+    .filter((part) => !part?.thought)
+    .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+    .join('');
+  try {
+    return JSON.parse(stripFences(text));
+  } catch {
+    throw new GeminiError('bad-json');
+  }
+}
+
+/**
+ * Short reason code for any failure.
+ * @param {unknown} err
+ */
+function failureCode(err) {
+  if (err instanceof GeminiError) return err.code;
+  if (err instanceof Error && err.name === 'TimeoutError') return 'timeout';
+  return 'network';
 }
 
 /** @param {string} s */
