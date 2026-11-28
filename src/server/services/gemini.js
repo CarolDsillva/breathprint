@@ -42,11 +42,13 @@ export function createGemini({
   logger,
 }) {
   const enabled = Boolean(apiKey);
-  const state = { lastError: /** @type {string | null} */ (null) };
+  /** @type {{ lastError: string | null }} */
+  const state = { lastError: null };
 
   let activeModel = model;
 
   /**
+   * POST one generateContent request with the key in a header.
    * @param {object} body
    * @param {string} [useModel]
    */
@@ -54,7 +56,7 @@ export function createGemini({
     const res = await fetchImpl(`${API}/${encodeURIComponent(useModel)}:generateContent`, {
       method: 'POST',
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': /** @type {string} */ (apiKey) },
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey ?? '' },
       body: JSON.stringify(body),
     });
     return res;
@@ -160,7 +162,10 @@ function failureCode(err) {
   return 'network';
 }
 
-/** @param {string} s */
+/**
+ * Remove markdown code fences that some models wrap around JSON.
+ * @param {string} s
+ */
 function stripFences(s) {
   return s
     .trim()

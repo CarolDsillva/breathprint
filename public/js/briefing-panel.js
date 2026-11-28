@@ -1,13 +1,14 @@
 // @ts-check
 /** Family briefing: a short plan from the numbers above, written by Gemini (or offline). */
-import { getCoach } from './api.js';
-import { announce, message, sourceNote } from './components.js';
-import { byId, h } from './dom.js';
+import { getBriefing } from './api.js';
+import { announce, errorMessage, message, sourceNote } from './components.js';
+import { buttonById, byId, h, selectById } from './dom.js';
 import { validInputs } from './state.js';
 
 /** @typedef {{ summary: string, tips: string[], source: string }} Briefing */
 
 /**
+ * The briefing text and a note saying who wrote it.
  * @param {Briefing} briefing
  * @param {string} language
  */
@@ -15,7 +16,7 @@ function briefingView(briefing, language) {
   return [
     h(
       'div',
-      { class: 'coach-text', lang: language },
+      { class: 'briefing-text', lang: language },
       h('p', null, briefing.summary),
       h('ul', null, ...briefing.tips.map((tip) => h('li', null, tip))),
     ),
@@ -27,10 +28,11 @@ function briefingView(briefing, language) {
   ];
 }
 
+/** Wire up the family briefing: button, language choice and output. */
 export function initBriefingPanel() {
-  const button = /** @type {HTMLButtonElement} */ (byId('coach-btn'));
-  const language = /** @type {HTMLSelectElement} */ (byId('coach-lang'));
-  const out = byId('coach-out');
+  const button = buttonById('briefing-btn');
+  const language = selectById('briefing-lang');
+  const out = byId('briefing-out');
   const status = byId('briefing-announce');
 
   button.addEventListener('click', async () => {
@@ -45,11 +47,11 @@ export function initBriefingPanel() {
     announce(status, 'Writing your family briefing.');
     try {
       /** @type {Briefing} */
-      const briefing = await getCoach(inputs.plan, inputs.forecast, language.value);
+      const briefing = await getBriefing(inputs.plan, inputs.forecast, language.value);
       out.replaceChildren(...briefingView(briefing, language.value));
       announce(status, 'Family briefing ready, below the button.');
     } catch (err) {
-      const text = /** @type {Error} */ (err).message;
+      const text = errorMessage(err);
       out.replaceChildren(message(text, true));
       announce(status, text);
     } finally {

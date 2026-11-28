@@ -1,10 +1,9 @@
 // @ts-check
 /** Section 01: find a place, load its hourly PM2.5 forecast and pick the day to plan. */
-import { SAMPLE_FORECAST, samplePlan } from '/engine/index.js';
-import { formatTime } from '/engine/time.js';
+import { formatTime, SAMPLE_FORECAST, samplePlan } from '/engine/index.js';
 import { getForecast, searchPlaces } from './api.js';
-import { band } from './components.js';
-import { byId, h } from './dom.js';
+import { band, errorMessage, statusLine } from './components.js';
+import { byId, formById, h, inputById, selectById } from './dom.js';
 import { replacePlan, setForecast, state } from './state.js';
 
 /** @typedef {import('./types.js').ForecastDay} ForecastDay */
@@ -56,10 +55,10 @@ export function renderAirStrip(el, pm) {
 /** Elements of this section, found once when the panel starts. */
 function findElements() {
   return {
-    form: /** @type {HTMLFormElement} */ (byId('place-form')),
-    input: /** @type {HTMLInputElement} */ (byId('place-input')),
+    form: formById('place-form'),
+    input: inputById('place-input'),
     results: byId('place-results'),
-    daySelect: /** @type {HTMLSelectElement} */ (byId('day-select')),
+    daySelect: selectById('day-select'),
     status: byId('air-status'),
     strip: byId('air-strip'),
     placeChip: byId('place-chip'),
@@ -70,18 +69,16 @@ function findElements() {
 let ui;
 
 /**
+ * Show a message in this section's status line.
  * @param {string} text
  * @param {boolean} [isError]
  */
-function say(text, isError = false) {
-  ui.status.textContent = text;
-  ui.status.classList.toggle('error', isError);
-}
+const say = (text, isError = false) => statusLine(ui.status)(text, isError);
 
 /** Show the chosen day's forecast and hand it to the rest of the app. */
 function selectDay() {
   const day = state.days[Number(ui.daySelect.value)] ?? state.days[0];
-  const known = /** @type {number[]} */ (day.pm25.filter((v) => v !== null));
+  const known = day.pm25.filter((v) => v !== null);
   say(
     `${state.place}, ${day.date}: PM2.5 from ${Math.round(Math.min(...known))} to ${Math.round(Math.max(...known))} µg/m³.`,
   );
@@ -110,6 +107,7 @@ function useDays(days, place) {
 }
 
 /**
+ * Fetch a place's forecast and offer its days.
  * @param {number} lat
  * @param {number} lon
  * @param {string} label
@@ -120,11 +118,14 @@ async function loadForecast(lat, lon, label) {
     const forecast = await getForecast(lat, lon);
     useDays(forecast.days, label);
   } catch (err) {
-    say(/** @type {Error} */ (err).message, true);
+    say(errorMessage(err), true);
   }
 }
 
-/** @param {Place} place */
+/**
+ * Use the place the user chose from the search results.
+ * @param {Place} place
+ */
 function pickPlace(place) {
   ui.results.replaceChildren();
   loadForecast(place.lat, place.lon, [place.name, place.region].filter(Boolean).join(', '));
@@ -155,7 +156,7 @@ async function searchPlace(query) {
     ui.results.replaceChildren(...choices);
     choices[0].focus();
   } catch (err) {
-    say(/** @type {Error} */ (err).message, true);
+    say(errorMessage(err), true);
   }
 }
 

@@ -1,6 +1,6 @@
 // @ts-check
 /** How each editor form field updates the plan. One small setter per field. */
-import { AGE_GROUPS, INTENSITIES, KINDS, MODES, SOURCES } from '/engine/constants.js';
+import { AGE_GROUPS, INTENSITIES, KINDS, MODES, SOURCES } from '/engine/index.js';
 import { fromTimeValue } from './dom.js';
 
 /** @typedef {import('./types.js').Activity} Activity */

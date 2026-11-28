@@ -25,4 +25,7 @@ Object.assign(globalThis, {
   HTMLElement: dom.window.HTMLElement,
   HTMLInputElement: dom.window.HTMLInputElement,
   HTMLSelectElement: dom.window.HTMLSelectElement,
+  HTMLButtonElement: dom.window.HTMLButtonElement,
+  HTMLFormElement: dom.window.HTMLFormElement,
+  HTMLImageElement: dom.window.HTMLImageElement,
 });

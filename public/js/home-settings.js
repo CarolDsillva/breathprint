@@ -1,13 +1,14 @@
 // @ts-check
 /** Home and neighbourhood settings (windows, purifier, nearby transit). */
-import { byId } from './dom.js';
+import { inputById, selectById } from './dom.js';
 import { planEdited, state, subscribe } from './state.js';
 
+/** Wire up the home settings and keep them in step with the plan. */
 export function initHomeSettings() {
-  const windows = /** @type {HTMLSelectElement} */ (byId('home-windows'));
-  const purifier = /** @type {HTMLInputElement} */ (byId('home-purifier'));
-  const metro = /** @type {HTMLInputElement} */ (byId('home-metro'));
-  const bus = /** @type {HTMLInputElement} */ (byId('home-bus'));
+  const windows = selectById('home-windows');
+  const purifier = inputById('home-purifier');
+  const metro = inputById('home-metro');
+  const bus = inputById('home-bus');
 
   function sync() {
     windows.value = state.plan.home.windows;

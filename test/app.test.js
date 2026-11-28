@@ -22,7 +22,7 @@ const delhi = { name: 'Delhi', region: 'Delhi', country: 'India', lat: 28.6, lon
 const server = {
   places: () => ({ places: [delhi, { ...delhi, name: 'Delhi', region: 'New York', country: 'US' }] }),
   forecast: () => ({ timezone: 'Asia/Kolkata', days }),
-  coach: () => ({ summary: 'आज हवा खराब है।', tips: ['खिड़कियां बंद रखें।', 'मेट्रो लें।'], source: 'gemini' }),
+  briefing: () => ({ summary: 'आज हवा खराब है।', tips: ['खिड़कियां बंद रखें।', 'मेट्रो लें।'], source: 'gemini' }),
   whatif: () => ({ change: { activityId: 'school-run', mode: 'metro' }, description: 'metro', source: 'gemini' }),
   scan: () => ({ findings: [{ id: 'incense', evidence: 'sticks burning' }], summary: 'A puja corner.' }),
 };
@@ -346,32 +346,32 @@ describe('03 · budget, choices and impact', () => {
 
 describe('family briefing', () => {
   it('shows the Gemini briefing in the chosen language and announces it', async () => {
-    change($('coach-lang'), 'hi');
-    $('coach-btn').click();
+    change($('briefing-lang'), 'hi');
+    $('briefing-btn').click();
     await settle();
-    assert.equal($('coach-out').querySelector('.coach-text').getAttribute('lang'), 'hi');
-    assert.match($('coach-out').textContent, /Written by Gemini/);
-    assert.equal($('coach-out').hasAttribute('aria-busy'), false);
+    assert.equal($('briefing-out').querySelector('.briefing-text').getAttribute('lang'), 'hi');
+    assert.match($('briefing-out').textContent, /Written by Gemini/);
+    assert.equal($('briefing-out').hasAttribute('aria-busy'), false);
     assert.match($('briefing-announce').textContent, /briefing ready/);
   });
 
   it('labels offline briefings and reports errors', async () => {
     await withServer(
-      'coach',
+      'briefing',
       () => ({ summary: 's', tips: ['t'], source: 'template' }),
       async () => {
-        $('coach-btn').click();
+        $('briefing-btn').click();
         await settle();
-        assert.match($('coach-out').textContent, /Written offline/);
+        assert.match($('briefing-out').textContent, /Written offline/);
       },
     );
     await withServer(
-      'coach',
+      'briefing',
       () => ({ status: 502, body: { error: 'AI is busy.' } }),
       async () => {
-        $('coach-btn').click();
+        $('briefing-btn').click();
         await settle();
-        assert.match($('coach-out').textContent, /AI is busy/);
+        assert.match($('briefing-out').textContent, /AI is busy/);
         assert.match($('briefing-announce').textContent, /AI is busy/);
       },
     );
@@ -528,8 +528,8 @@ describe('when inputs are missing', () => {
   it('asks for a forecast before briefings and what-ifs', async () => {
     change($('a-cricket-hours'), '0');
     await settle();
-    $('coach-btn').click();
-    assert.match($('coach-out').textContent, /Load a forecast and complete your day first/);
+    $('briefing-btn').click();
+    assert.match($('briefing-out').textContent, /Load a forecast and complete your day first/);
     submit('whatif-form');
     assert.match($('whatif-out').textContent, /Load a forecast and complete your day first/);
     submit('checklist-form');

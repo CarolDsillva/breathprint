@@ -2,8 +2,8 @@
 /** Section 06, Smoke Detective: room photo (Gemini vision) or checklist → indoor fixes with real impact. */
 import { FINDINGS, compareChange, findingsToFixes, isFindingId, validatePlan } from '/engine/index.js';
 import { scanPhoto } from './api.js';
-import { impactChips } from './components.js';
-import { byId, h } from './dom.js';
+import { errorMessage, impactChips, statusLine } from './components.js';
+import { buttonById, byId, elementById, h, inputById } from './dom.js';
 import { state } from './state.js';
 
 /** @typedef {import('./types.js').ChangeRequest} ChangeRequest */
@@ -25,13 +25,9 @@ export async function shrinkPhoto(file) {
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
-  /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d')).drawImage(
-    bitmap,
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  );
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Could not process the photo.');
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
   /** @type {Blob} */
   const blob = await new Promise((resolve, reject) =>
@@ -54,12 +50,12 @@ export async function shrinkPhoto(file) {
 /** Elements of this section, found once when it starts. */
 function findElements() {
   return {
-    fileInput: /** @type {HTMLInputElement} */ (byId('scan-file')),
-    preview: /** @type {HTMLImageElement} */ (byId('scan-preview')),
+    fileInput: inputById('scan-file'),
+    preview: elementById('scan-preview', HTMLImageElement),
     status: byId('scan-status'),
     out: byId('scan-out'),
     checklist: byId('checklist'),
-    scanBtn: /** @type {HTMLButtonElement} */ (byId('scan-btn')),
+    scanBtn: buttonById('scan-btn'),
   };
 }
 
@@ -69,13 +65,11 @@ let ui;
 let applyChange = () => {};
 
 /**
+ * Show a message in this section's status line.
  * @param {string} text
- * @param {boolean} [error]
+ * @param {boolean} [isError]
  */
-function say(text, error = false) {
-  ui.status.textContent = text;
-  ui.status.classList.toggle('error', error);
-}
+const say = (text, isError = false) => statusLine(ui.status)(text, isError);
 
 /** @param {string} text */
 const hint = (text) => h('span', { class: 'hint' }, text);
@@ -171,7 +165,7 @@ async function onScanSubmit() {
   try {
     await scanFile(file);
   } catch (err) {
-    say(`${/** @type {Error} */ (err).message} You can use the checklist below instead.`, true);
+    say(`${errorMessage(err)} You can use the checklist below instead.`, true);
   } finally {
     ui.scanBtn.disabled = false;
   }

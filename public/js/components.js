@@ -4,6 +4,24 @@ import { fmt, fmt1, h } from './dom.js';
 
 /** @typedef {import('./types.js').Comparison} Comparison */
 
+/**
+ * A status line: `say(text)` shows a message there, `say(text, true)` marks it as a problem.
+ * @param {HTMLElement} el usually a role="status" paragraph
+ * @returns {(text: string, isError?: boolean) => void}
+ */
+export function statusLine(el) {
+  return (text, isError = false) => {
+    el.textContent = text;
+    el.classList.toggle('error', isError);
+  };
+}
+
+/**
+ * The message of anything thrown, for showing to the user.
+ * @param {unknown} err
+ */
+export const errorMessage = (err) => (err instanceof Error ? err.message : String(err));
+
 /** PM2.5 bands (µg/m³) with plain-language names, aligned with India's NAQI breakpoints. */
 const BANDS = [
   { max: 30, name: 'Good' },

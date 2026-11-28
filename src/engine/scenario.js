@@ -109,8 +109,8 @@ export function checkChange(plan, change) {
   if (!touchesHome && changesNothing(a, change)) problems.push(`That is already how "${a.label}" is planned.`);
   if (problems.length) return problems;
 
-  const moved = /** @type {Activity} */ (applyChange(plan, change).activities.find((x) => x.id === a.id));
-  return timingProblems(plan, moved, typeof change.start === 'number');
+  const moved = applyChange(plan, change).activities.find((x) => x.id === a.id);
+  return moved ? timingProblems(plan, moved, typeof change.start === 'number') : [];
 }
 
 /**
@@ -129,6 +129,7 @@ export function describeChange(plan, change) {
 }
 
 /**
+ * Describe the parts of a change that touch one activity.
  * @param {Activity} a
  * @param {Change} change
  * @returns {string[]}
@@ -199,7 +200,10 @@ export function pct(a, b) {
   return a === 0 ? 0 : ((b - a) / a) * 100;
 }
 
-/** @param {number} n */
+/**
+ * Round to two decimal places.
+ * @param {number} n
+ */
 function round2(n) {
   return Math.round(n * 100) / 100;
 }

@@ -7,6 +7,7 @@ const ONE_DAY_S = 86_400;
 const FIFTEEN_MINUTES_S = 900;
 
 /**
+ * Routes for place search and forecasts.
  * @param {{ air: ReturnType<typeof import('../services/airQuality.js').createAirQualityService> }} deps
  */
 export function airRoutes({ air }) {

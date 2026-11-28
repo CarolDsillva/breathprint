@@ -1,5 +1,7 @@
 // @ts-check
+/** Server entry point: read the settings, build the app and start listening. */
 import { createApp } from './app.js';
+import { readConfig } from './config.js';
 import { createAirQualityService } from './services/airQuality.js';
 import { createGemini } from './services/gemini.js';
 
@@ -8,20 +10,18 @@ try {
 } catch {
   // No .env file: rely on the real environment.
 }
-const port = Number(process.env.PORT) || 8080;
+
+const config = readConfig(process.env);
+for (const warning of config.warnings) console.warn(`[breathprint] ${warning}`);
 
 const app = createApp({
   air: createAirQualityService(),
-  gemini: createGemini({
-    apiKey: process.env.GEMINI_API_KEY,
-    model: process.env.GEMINI_MODEL || undefined,
-    logger: console,
-  }),
+  gemini: createGemini({ apiKey: config.geminiApiKey, model: config.geminiModel, logger: console }),
 });
 
-const server = app.listen(port, () => {
+const server = app.listen(config.port, () => {
   console.log(
-    `Breathprint on http://localhost:${port} (AI: ${process.env.GEMINI_API_KEY ? 'Gemini' : 'offline mode'})`,
+    `Breathprint on http://localhost:${config.port} (AI: ${config.geminiApiKey ? 'Gemini' : 'offline mode'})`,
   );
 });
 

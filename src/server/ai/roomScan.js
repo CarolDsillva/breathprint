@@ -7,6 +7,7 @@ import { sanitizeScan } from '../../engine/scan.js';
 import { SCAN_SYSTEM } from './prompts.js';
 
 /**
+ * Ask Gemini which known findings are visible in the photo.
  * @param {import('./client.js').AiClient} ai
  * @param {import('./client.js').InlineImage} image already validated by decodeImage
  * @returns {Promise<(NonNullable<ReturnType<typeof sanitizeScan>> & { source: 'gemini' }) | null>}

@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import jsdoc from 'eslint-plugin-jsdoc';
 
 export default [
   { ignores: ['node_modules/', 'coverage/'] },
@@ -39,6 +40,21 @@ export default [
       'max-params': ['error', 4],
       'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['error', { max: 80, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
+    // Every function says what it does; every export is documented. Types are checked by tsc.
+    files: ['src/**/*.js', 'public/**/*.js'],
+    plugins: { jsdoc },
+    rules: {
+      'jsdoc/require-jsdoc': [
+        'error',
+        { publicOnly: true, require: { FunctionDeclaration: true, ArrowFunctionExpression: true } },
+      ],
+      'jsdoc/require-description': ['error', { contexts: ['FunctionDeclaration'] }],
+      'jsdoc/check-param-names': 'error',
+      'jsdoc/check-tag-names': ['error', { definedTags: ['template'] }],
+      'jsdoc/no-multi-asterisks': 'error',
     },
   },
 ];

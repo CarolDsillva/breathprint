@@ -1,6 +1,6 @@
 // @ts-check
 /** Form cards for one person and one activity. Pure builders: no state, no listeners. */
-import { AGE_GROUPS, LIMITS, MODES, SOURCES } from '/engine/constants.js';
+import { AGE_GROUPS, LIMITS, MODES, SOURCES } from '/engine/index.js';
 import { h, toTimeValue } from './dom.js';
 import { DEFAULT_TRIP, DEFAULT_WINDOW } from './editor-fields.js';
 
@@ -28,6 +28,7 @@ const INTENSITY_LABELS = Object.freeze({
 const labelsOf = (table) => Object.fromEntries(Object.entries(table).map(([k, v]) => [k, v.label]));
 
 /**
+ * <option> elements for a select, with one selected.
  * @param {Readonly<Record<string, string>>} labels
  * @param {string} selected
  */
@@ -55,6 +56,7 @@ function checkbox(text, attrs) {
 }
 
 /**
+ * A "Remove" button carrying the id of what it removes.
  * @param {Record<string, string>} dataset
  * @param {string} ariaLabel
  * @param {boolean} [disabled]

@@ -1,18 +1,37 @@
 {
   "name": "breathprint",
   "version": "1.0.0",
-  "description": "GenAI assistant that turns a family's day into the smog each person breathes, and shows how each choice changes it for their lungs and their city.",
+  "description": "GenAI urban air quality assistant: the PM2.5 each family member breathes, hour by hour, and how every choice changes it for their lungs and their city.",
+  "keywords": [
+    "air-quality",
+    "pm2.5",
+    "smog",
+    "gemini",
+    "genai",
+    "accessibility",
+    "india"
+  ],
+  "homepage": "https://breathprint-jade.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CarolDsillva/breathprint.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CarolDsillva/breathprint/issues"
+  },
+  "license": "MIT",
+  "author": "CarolDsillva",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "main": "src/server/index.js",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "start": "node src/server/index.js",
     "dev": "node --watch src/server/index.js",
-    "test": "node --test",
-    "coverage": "node --test --experimental-test-coverage",
+    "test": "node --test \"test/*.test.js\"",
+    "coverage": "node --test --experimental-test-coverage \"test/*.test.js\"",
     "lint": "eslint .",
     "typecheck": "tsc -p .",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
@@ -30,6 +49,7 @@
     "@types/node": "^26.6.11",
     "axe-core": "^4.14.1",
     "eslint": "^10.15.0",
+    "eslint-plugin-jsdoc": "^65.5.7",
     "globals": "^17.14.0",
     "jsdom": "^31.0.1",
     "prettier": "^3.10.1",

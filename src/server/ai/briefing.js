@@ -16,6 +16,13 @@ export const LANGUAGES = /** @type {const} */ ({ en: 'English', hi: 'Hindi' });
 
 /** @typedef {keyof typeof LANGUAGES} Language */
 
+/**
+ * One of the briefing languages.
+ * @param {unknown} value
+ * @returns {value is Language}
+ */
+export const isLanguage = (value) => typeof value === 'string' && Object.hasOwn(LANGUAGES, value);
+
 const MAX_TIPS = 4;
 
 /** @param {number} n */
@@ -29,7 +36,7 @@ const round1 = (n) => Math.round(n * 10) / 10;
 export function buildFacts(plan, pm) {
   const day = computeDay(plan, pm);
   const smarter = computeDay(optimizeDay(plan, pm).plan, pm);
-  const known = /** @type {number[]} */ (pm.filter((v) => v !== null));
+  const known = pm.filter((v) => v !== null);
   const cleanest = Math.min(...known);
   return {
     airThatDay: { worstPm25: Math.max(...known), cleanestPm25: cleanest, cleanestHour: pm.indexOf(cleanest) },

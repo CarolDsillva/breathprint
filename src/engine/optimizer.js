@@ -151,7 +151,8 @@ export function suggest(plan, pm) {
     }
   }
   if (plan.home.windows === 'open' && !plan.home.purifier) {
-    const change = /** @type {Change} */ ({ windows: 'closed' });
+    /** @type {Change} */
+    const change = { windows: 'closed' };
     push(
       'windows',
       { change, r: compareChange(plan, pm, change) },

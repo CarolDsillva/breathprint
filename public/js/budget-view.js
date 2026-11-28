@@ -1,7 +1,6 @@
 // @ts-check
 /** Rendering for the breath-budget section: headline numbers, hour grid, people, choices, impact. */
-import { AGE_GROUPS, WHO_24H_PM25 } from '/engine/constants.js';
-import { formatTime } from '/engine/time.js';
+import { AGE_GROUPS, formatTime, WHO_24H_PM25 } from '/engine/index.js';
 import { band, impactChips } from './components.js';
 import { fmt, fmt1, h } from './dom.js';
 

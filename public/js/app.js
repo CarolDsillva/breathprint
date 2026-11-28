@@ -5,7 +5,7 @@
  */
 import { initBriefingPanel } from './briefing-panel.js';
 import { initBudgetPanel } from './budget-panel.js';
-import { byId } from './dom.js';
+import { buttonById, byId } from './dom.js';
 import { initEditor } from './editor.js';
 import { initForecastPanel } from './forecast-panel.js';
 import { initHomeSettings } from './home-settings.js';
@@ -16,8 +16,8 @@ import { initWhatIfPanel } from './whatif-panel.js';
 initEditor({
   membersEl: byId('members'),
   activitiesEl: byId('activities'),
-  addMemberBtn: /** @type {HTMLButtonElement} */ (byId('add-member')),
-  addActivityBtn: /** @type {HTMLButtonElement} */ (byId('add-activity')),
+  addMemberBtn: buttonById('add-member'),
+  addActivityBtn: buttonById('add-activity'),
 });
 initHomeSettings();
 const budget = initBudgetPanel();

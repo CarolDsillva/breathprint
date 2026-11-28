@@ -37,7 +37,10 @@ function errorHandler(logger) {
   };
 }
 
-/** @param {AppDeps} deps */
+/**
+ * Build the Express app with security headers, API routes, static files and errors.
+ * @param {AppDeps} deps
+ */
 export function createApp({
   air,
   gemini,

@@ -1,6 +1,6 @@
 // @ts-check
 /** Section 02: editors for the people at home and their activities. */
-import { LIMITS } from '/engine/constants.js';
+import { LIMITS } from '/engine/index.js';
 import { activityCard, memberCard } from './editor-cards.js';
 import { DEFAULT_WINDOW, setActivityField, setMemberField } from './editor-fields.js';
 import { planEdited, state, subscribe } from './state.js';
@@ -11,6 +11,21 @@ import { planEdited, state, subscribe } from './state.js';
  * @typedef {{ membersEl: HTMLElement, activitiesEl: HTMLElement,
  *   addMemberBtn: HTMLButtonElement, addActivityBtn: HTMLButtonElement }} EditorElements
  */
+
+/**
+ * An editable field (input or select), as opposed to a Remove button.
+ * @param {EventTarget | null} target
+ * @returns {target is FormControl}
+ */
+const isFormControl = (target) => target instanceof HTMLInputElement || target instanceof HTMLSelectElement;
+
+/**
+ * The id carried by a clicked Remove button, if the event was one.
+ * @param {Event} e
+ * @param {'removeMember' | 'removeActivity'} key
+ */
+const removeTarget = (e, key) =>
+  e.type === 'click' && e.target instanceof HTMLButtonElement ? e.target.dataset[key] : undefined;
 
 /** Changing these fields changes which other fields an activity shows. */
 const STRUCTURAL_FIELDS = new Set(['kind', 'flexible']);
@@ -60,14 +75,20 @@ function addActivityTo(plan) {
   return id;
 }
 
-/** @param {EditorElements} ui */
+/**
+ * Redraw the people cards and enable "Add a person" while under the limit.
+ * @param {EditorElements} ui
+ */
 function renderMembers(ui) {
   const { members } = state.plan;
   ui.membersEl.replaceChildren(...members.map((m, i) => memberCard(m, i, members.length)));
   ui.addMemberBtn.disabled = members.length >= LIMITS.members;
 }
 
-/** @param {EditorElements} ui */
+/**
+ * Redraw the activity cards and enable "Add an activity" while under the limit.
+ * @param {EditorElements} ui
+ */
 function renderActivities(ui) {
   const { activities, members } = state.plan;
   ui.activitiesEl.replaceChildren(...activities.map((a) => activityCard(a, members)));
@@ -80,14 +101,16 @@ function renderActivities(ui) {
  * @param {Event} e
  */
 function onMemberEvent(ui, e) {
-  const control = /** @type {FormControl} */ (e.target);
-  const { removeMember: removeId, member: memberId, field: name } = control.dataset;
-  if (removeId && e.type === 'click') {
+  const removeId = removeTarget(e, 'removeMember');
+  if (removeId) {
     removeMemberFrom(state.plan, removeId);
     renderMembers(ui);
     renderActivities(ui);
     return planEdited();
   }
+  const control = e.target;
+  if (!isFormControl(control)) return;
+  const { member: memberId, field: name } = control.dataset;
   const member = state.plan.members.find((m) => m.id === memberId);
   if (!member || !name || e.type !== 'change') return;
   setMemberField(member, name, control);
@@ -101,14 +124,16 @@ function onMemberEvent(ui, e) {
  * @param {Event} e
  */
 function onActivityEvent(ui, e) {
-  const control = /** @type {FormControl} */ (e.target);
-  const { removeActivity: removeId, activity: activityId, field: name } = control.dataset;
-  if (removeId && e.type === 'click') {
+  const removeId = removeTarget(e, 'removeActivity');
+  if (removeId) {
     state.plan.activities = state.plan.activities.filter((a) => a.id !== removeId);
     renderActivities(ui);
     ui.addActivityBtn.focus();
     return planEdited();
   }
+  const control = e.target;
+  if (!isFormControl(control)) return;
+  const { activity: activityId, field: name } = control.dataset;
   const activity = state.plan.activities.find((a) => a.id === activityId);
   if (!activity || !name || e.type !== 'change') return;
   setActivityField(activity, name, control);

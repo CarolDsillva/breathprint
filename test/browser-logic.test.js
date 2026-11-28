@@ -201,7 +201,7 @@ describe('API client', () => {
     );
     await assert.rejects(api.getForecast(28.6, 77.2), /Too many requests/);
     mock.method(globalThis, 'fetch', async () => new Response('oops', { status: 500 }));
-    await assert.rejects(api.getCoach({}, [], 'en'), /Request failed \(500\)/);
+    await assert.rejects(api.getBriefing({}, [], 'en'), /Request failed \(500\)/);
     mock.method(globalThis, 'fetch', async () => {
       throw new TypeError('offline');
     });

@@ -35,7 +35,10 @@ export function activityHours(a) {
   return a.hours;
 }
 
-/** @param {Home} home */
+/**
+ * Ratio of indoor to outdoor PM2.5 at home: purifier, closed or open windows.
+ * @param {Home} home
+ */
 export function homeRatio(home) {
   if (home.purifier) return PLACE_RATIO['home-purifier'];
   return home.windows === 'open' ? PLACE_RATIO['home-open'] : PLACE_RATIO['home-closed'];
@@ -51,7 +54,7 @@ export function activityEnvironment(a, home) {
   switch (a.kind) {
     case 'commute': {
       const mode = MODES[a.mode ?? 'bus'];
-      return { ratio: mode.ratio, add: 0, intensity: /** @type {Activity['intensity']} */ (mode.intensity) };
+      return { ratio: mode.ratio, add: 0, intensity: mode.intensity };
     }
     case 'outdoor':
       return { ratio: a.nearTraffic ? PLACE_RATIO.roadside : PLACE_RATIO.outdoor, add: 0, intensity: a.intensity };
@@ -62,7 +65,10 @@ export function activityEnvironment(a, home) {
   }
 }
 
-/** @param {Member} m */
+/**
+ * How much this person counts when ranking choices (children, elders, sensitive higher).
+ * @param {Member} m
+ */
 export function memberWeight(m) {
   return AGE_GROUPS[m.ageGroup].weight + (m.sensitive ? SENSITIVE_WEIGHT_BONUS : 0);
 }
@@ -162,14 +168,11 @@ export function computeDay(plan, pm) {
  */
 export function memberTimeline(plan, member) {
   const sleep = plan.sleep ?? DEFAULT_SLEEP;
-  const best = Array.from({ length: 24 }, (_, hour) => ({
-    share: 0,
-    slot: {
-      kind: /** @type {Activity['kind'] | 'sleep'} */ (isSleepHour(hour, sleep) ? 'sleep' : 'home'),
-      label: isSleepHour(hour, sleep) ? 'Asleep' : 'At home',
-      smoke: false,
-    },
-  }));
+  /** @type {{ share: number, slot: { kind: Activity['kind'] | 'sleep', label: string, smoke: boolean } }[]} */
+  const best = Array.from({ length: 24 }, (_, hour) => {
+    const asleep = isSleepHour(hour, sleep);
+    return { share: 0, slot: { kind: asleep ? 'sleep' : 'home', label: asleep ? 'Asleep' : 'At home', smoke: false } };
+  });
   for (const a of plan.activities) {
     if (!a.memberIds.includes(member.id)) continue;
     for (const { hour, fraction } of segments(a.start, activityHours(a))) {

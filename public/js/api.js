@@ -2,6 +2,7 @@
 /** Calls to the Breathprint server. Every call has a timeout and returns parsed JSON or throws a friendly Error. */
 
 /**
+ * Fetch JSON from the server with a timeout; failures become friendly Error messages.
  * @param {string} url
  * @param {RequestInit} [init]
  */
@@ -35,8 +36,8 @@ export const getForecast = (lat, lon) => request(`/api/forecast?lat=${lat.toFixe
  * @param {(number | null)[]} forecast
  * @param {string} language
  */
-export const getCoach = (plan, forecast, language) =>
-  request('/api/coach', { method: 'POST', body: JSON.stringify({ plan, forecast, language }) });
+export const getBriefing = (plan, forecast, language) =>
+  request('/api/briefing', { method: 'POST', body: JSON.stringify({ plan, forecast, language }) });
 
 /**
  * @param {unknown} plan

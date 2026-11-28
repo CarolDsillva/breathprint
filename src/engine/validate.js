@@ -74,6 +74,7 @@ const oneOf = (v, allowed) =>
   (Array.isArray(allowed) ? allowed.includes(/** @type {K} */ (v)) : Object.hasOwn(allowed, v));
 
 /**
+ * Check one family member: id, age group and a cleaned name.
  * @param {unknown} raw
  * @param {number} index
  * @returns {Checked<Member>}
@@ -86,6 +87,7 @@ function readMember(raw, index) {
 }
 
 /**
+ * Home settings with safe defaults (windows open, no purifier, transit nearby).
  * @param {unknown} raw
  * @returns {Home}
  */
@@ -143,6 +145,7 @@ function readWindow(raw, hours, label) {
 }
 
 /**
+ * Check one activity: id, kind, time, people, duration and kind-specific fields.
  * @param {unknown} raw
  * @param {number} index
  * @param {Set<string>} memberIds

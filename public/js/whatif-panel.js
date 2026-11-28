@@ -2,8 +2,8 @@
 /** Section 04: ask about one change in plain words and compare before and after. */
 import { compareChange } from '/engine/index.js';
 import { askWhatIf } from './api.js';
-import { announce, comparisonCard, impactSummary, message, sourceNote } from './components.js';
-import { byId, h } from './dom.js';
+import { announce, comparisonCard, errorMessage, impactSummary, message, sourceNote } from './components.js';
+import { byId, formById, h, inputById } from './dom.js';
 import { validInputs } from './state.js';
 
 /** @typedef {import('./types.js').ChangeRequest} ChangeRequest */
@@ -42,10 +42,13 @@ function answerView(answer, inputs, apply) {
   };
 }
 
-/** @param {{ apply: (request: ChangeRequest) => void }} deps */
+/**
+ * Wire up the what-if box and its example questions.
+ * @param {{ apply: (request: ChangeRequest) => void }} deps
+ */
 export function initWhatIfPanel({ apply }) {
-  const form = /** @type {HTMLFormElement} */ (byId('whatif-form'));
-  const input = /** @type {HTMLInputElement} */ (byId('whatif-input'));
+  const form = formById('whatif-form');
+  const input = inputById('whatif-input');
   const out = byId('whatif-out');
   const status = byId('whatif-announce');
 
@@ -63,7 +66,7 @@ export function initWhatIfPanel({ apply }) {
       out.replaceChildren(...view);
       announce(status, spoken);
     } catch (err) {
-      const text = /** @type {Error} */ (err).message;
+      const text = errorMessage(err);
       out.replaceChildren(message(text, true));
       announce(status, text);
     } finally {
@@ -72,7 +75,7 @@ export function initWhatIfPanel({ apply }) {
   });
 
   byId('whatif-examples').addEventListener('click', (e) => {
-    const question = /** @type {HTMLElement} */ (e.target).dataset.example;
+    const question = e.target instanceof HTMLElement ? e.target.dataset.example : undefined;
     if (!question) return;
     input.value = question;
     form.requestSubmit();

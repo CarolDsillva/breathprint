@@ -1,8 +1,17 @@
 // @ts-check
 /** Section 03: the family's breath budget, the choices that change it, and their wider impact. */
-import { compareChange, computeDay, memberTimeline, optimizeDay, suggest, validatePlan } from '/engine/index.js';
-import { seasonSavings, smogSeasonDaysLeft } from '/engine/impact.js';
+import {
+  compareChange,
+  computeDay,
+  memberTimeline,
+  optimizeDay,
+  seasonSavings,
+  smogSeasonDaysLeft,
+  suggest,
+  validatePlan,
+} from '/engine/index.js';
 import { renderBudget, renderHourGrid, renderSeason, renderStats, renderSuggestions } from './budget-view.js';
+import { statusLine } from './components.js';
 import { byId } from './dom.js';
 import { initRipplePanel } from './ripple-panel.js';
 import { replacePlan, restoreOriginal, state, subscribe, validInputs } from './state.js';
@@ -25,14 +34,7 @@ export function initBudgetPanel() {
   const ripple = initRipplePanel();
   let timer = 0;
 
-  /**
-   * @param {string} text
-   * @param {boolean} [isError]
-   */
-  const say = (text, isError = false) => {
-    status.textContent = text;
-    status.classList.toggle('error', isError);
-  };
+  const say = statusLine(status);
 
   function render() {
     undo.hidden = !state.original;
@@ -61,7 +63,10 @@ export function initBudgetPanel() {
     renderSuggestions(byId('suggestions'), suggest(plan, pm).slice(0, MAX_SUGGESTIONS), apply);
   }
 
-  /** @param {ChangeRequest} request */
+  /**
+   * Apply one chosen change, keeping the family's own plan for undo.
+   * @param {ChangeRequest} request
+   */
   function apply({ change, title }) {
     const inputs = validInputs();
     if (!inputs) return;

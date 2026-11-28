@@ -32,12 +32,18 @@ export const state = {
 /** @type {Set<(kind: ChangeKind) => void>} */
 const listeners = new Set();
 
-/** @param {(kind: ChangeKind) => void} listener */
+/**
+ * Call `listener` whenever the plan or forecast changes.
+ * @param {(kind: ChangeKind) => void} listener
+ */
 export function subscribe(listener) {
   listeners.add(listener);
 }
 
-/** @param {ChangeKind} kind */
+/**
+ * Save the plan (unless only the forecast changed) and notify every listener.
+ * @param {ChangeKind} kind
+ */
 function emit(kind) {
   if (kind !== 'forecast') savePlan();
   for (const listener of listeners) listener(kind);
@@ -93,7 +99,10 @@ export function planEdited() {
   emit('edited');
 }
 
-/** @param {Forecast} forecast */
+/**
+ * Use a new forecast and notify listeners.
+ * @param {Forecast} forecast
+ */
 export function setForecast(forecast) {
   state.forecast = forecast;
   emit('forecast');

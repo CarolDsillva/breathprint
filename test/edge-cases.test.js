@@ -103,3 +103,25 @@ describe('server error handling', () => {
     }
   });
 });
+
+describe('server settings', () => {
+  it('reads valid settings', async () => {
+    const { readConfig } = await import('../src/server/config.js');
+    assert.deepEqual(readConfig({ PORT: '3000', GEMINI_API_KEY: ' key ', GEMINI_MODEL: 'gemini-flash-latest' }), {
+      port: 3000,
+      geminiApiKey: 'key',
+      geminiModel: 'gemini-flash-latest',
+      warnings: [],
+    });
+  });
+
+  it('falls back to safe defaults with a warning', async () => {
+    const { readConfig } = await import('../src/server/config.js');
+    const config = readConfig({ PORT: 'eighty', GEMINI_API_KEY: '  ', GEMINI_MODEL: '../../etc' });
+    assert.equal(config.port, 8080);
+    assert.equal(config.geminiApiKey, undefined, 'a blank key means offline mode');
+    assert.equal(config.geminiModel, undefined);
+    assert.equal(config.warnings.length, 2);
+    assert.equal(readConfig({}).port, 8080);
+  });
+});

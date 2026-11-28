@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import express, { Router } from 'express';
 import { cleanText, isForecast, validatePlan } from '../../engine/validate.js';
-import { LANGUAGES, writeBriefing } from '../ai/briefing.js';
+import { isLanguage, writeBriefing } from '../ai/briefing.js';
 import { scanRoom } from '../ai/roomScan.js';
 import { interpretWhatIf } from '../ai/whatif.js';
 import { TtlCache } from '../cache.js';
@@ -44,6 +44,7 @@ function parsePlanAndForecast(body) {
 }
 
 /**
+ * Routes for the briefing, what-if questions and photo scans.
  * @param {{ gemini: ReturnType<typeof import('../services/gemini.js').createGemini>, limiter: import('express').RequestHandler }} deps
  */
 export function aiRoutes({ gemini, limiter }) {
@@ -51,14 +52,11 @@ export function aiRoutes({ gemini, limiter }) {
   // Same plan + same air + same language → reuse the last briefing for 10 minutes.
   const briefingCache = new TtlCache({ ttlMs: BRIEFING_CACHE_MS, max: 300 });
 
-  router.post('/coach', limiter, SMALL_BODY, async (req, res) => {
+  router.post('/briefing', limiter, SMALL_BODY, async (req, res) => {
     const body = fields(req.body);
     const input = parsePlanAndForecast(body);
     if ('error' in input) return res.status(400).json(input);
-    const language =
-      typeof body.language === 'string' && Object.hasOwn(LANGUAGES, body.language)
-        ? /** @type {keyof typeof LANGUAGES} */ (body.language)
-        : 'en';
+    const language = isLanguage(body.language) ? body.language : 'en';
     const key = createHash('sha256')
       .update(JSON.stringify([input.plan, input.forecast, language]))
       .digest('hex');

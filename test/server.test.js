@@ -125,7 +125,7 @@ describe('HTTP API (offline AI)', () => {
   });
 
   it('writes an offline briefing grounded in engine numbers', async () => {
-    const r = await post(`${ctx.base}/api/coach`, { plan: samplePlan(), forecast: SAMPLE_FORECAST, language: 'en' });
+    const r = await post(`${ctx.base}/api/briefing`, { plan: samplePlan(), forecast: SAMPLE_FORECAST, language: 'en' });
     const body = await r.json();
     assert.equal(r.status, 200);
     assert.equal(body.source, 'template');
@@ -134,9 +134,9 @@ describe('HTTP API (offline AI)', () => {
   });
 
   it('rejects invalid plans, forecasts and bodies', async () => {
-    assert.equal((await post(`${ctx.base}/api/coach`, { plan: {}, forecast: SAMPLE_FORECAST })).status, 400);
-    assert.equal((await post(`${ctx.base}/api/coach`, { plan: samplePlan(), forecast: [1, 2, 3] })).status, 400);
-    const bad = await fetch(`${ctx.base}/api/coach`, {
+    assert.equal((await post(`${ctx.base}/api/briefing`, { plan: {}, forecast: SAMPLE_FORECAST })).status, 400);
+    assert.equal((await post(`${ctx.base}/api/briefing`, { plan: samplePlan(), forecast: [1, 2, 3] })).status, 400);
+    const bad = await fetch(`${ctx.base}/api/briefing`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: '{nope',
@@ -185,7 +185,7 @@ describe('HTTP API with Gemini', () => {
     const ctx = await start({ gemini: createGemini({ apiKey: 'test-key', model: 'm', fetchImpl }) });
     try {
       const body = await (
-        await post(`${ctx.base}/api/coach`, { plan: samplePlan(), forecast: SAMPLE_FORECAST, language: 'hi' })
+        await post(`${ctx.base}/api/briefing`, { plan: samplePlan(), forecast: SAMPLE_FORECAST, language: 'hi' })
       ).json();
       assert.equal(body.source, 'gemini');
       assert.equal(body.tips.length, 2);
@@ -194,7 +194,7 @@ describe('HTTP API with Gemini', () => {
       assert.equal(call.init.headers['x-goog-api-key'], 'test-key');
       assert.match(JSON.parse(call.init.body).contents[0].parts[0].text, /Hindi/);
       // Same request again is served from cache.
-      await post(`${ctx.base}/api/coach`, { plan: samplePlan(), forecast: SAMPLE_FORECAST, language: 'hi' });
+      await post(`${ctx.base}/api/briefing`, { plan: samplePlan(), forecast: SAMPLE_FORECAST, language: 'hi' });
       assert.equal(fetchImpl.calls.length, 1);
     } finally {
       ctx.server.close();
@@ -210,10 +210,10 @@ describe('HTTP API with Gemini', () => {
     });
     const ctx = await start({ gemini: createGemini({ apiKey: 'k', fetchImpl }) });
     try {
-      const coach = await (
-        await post(`${ctx.base}/api/coach`, { plan: samplePlan(), forecast: SAMPLE_FORECAST })
+      const briefing = await (
+        await post(`${ctx.base}/api/briefing`, { plan: samplePlan(), forecast: SAMPLE_FORECAST })
       ).json();
-      assert.equal(coach.source, 'template');
+      assert.equal(briefing.source, 'template');
       const w = await (
         await post(`${ctx.base}/api/whatif`, { plan: samplePlan(), question: 'office commute by metro' })
       ).json();
@@ -362,7 +362,7 @@ describe('Gemini client robustness', () => {
     });
     const ctx = await start({ gemini });
     try {
-      await post(`${ctx.base}/api/coach`, { plan: samplePlan(), forecast: SAMPLE_FORECAST });
+      await post(`${ctx.base}/api/briefing`, { plan: samplePlan(), forecast: SAMPLE_FORECAST });
       const text = await (await fetch(`${ctx.base}/api/health`)).text();
       assert.deepEqual(JSON.parse(text), {
         ok: true,

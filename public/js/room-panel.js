@@ -2,10 +2,17 @@
 /** Section 05: how long a purifier takes to make the bedroom safe, and whether it is big enough. */
 import { PURIFIERS, SAMPLE_FORECAST, purifierPlan } from '/engine/index.js';
 import { announce, message } from './components.js';
-import { byId, fmt, fmt1, h } from './dom.js';
+import { byId, fmt, fmt1, h, inputById, selectById } from './dom.js';
 import { state, subscribe } from './state.js';
 
 /** @typedef {keyof typeof PURIFIERS} PurifierId */
+
+/**
+ * One of the purifier presets.
+ * @param {string} id
+ * @returns {id is PurifierId}
+ */
+const isPurifierId = (id) => Object.hasOwn(PURIFIERS, id);
 
 const MAX_ROOM_SIDE_M = 20;
 /** Night-time hours (the end of the forecast day) set the outdoor air while people sleep. */
@@ -14,6 +21,7 @@ const NIGHT_HOURS = 6;
 const ANNOUNCE_DELAY_MS = 700;
 
 /**
+ * Show the purifier's verdict, the minutes to clean air and the CADR the room needs.
  * @param {HTMLElement} el
  * @param {ReturnType<typeof purifierPlan>} r
  * @param {string} purifierLabel
@@ -40,13 +48,14 @@ function renderRoom(el, r, purifierLabel) {
   );
 }
 
+/** Wire up the clean-room calculator; it recalculates as the room or the forecast changes. */
 export function initRoomPanel() {
   const form = byId('room-form');
   const out = byId('room-out');
-  const purifier = /** @type {HTMLSelectElement} */ (byId('room-purifier'));
-  const windowOpen = /** @type {HTMLInputElement} */ (byId('room-open'));
+  const purifier = selectById('room-purifier');
+  const windowOpen = inputById('room-open');
   /** @param {string} id */
-  const metres = (id) => Number(/** @type {HTMLInputElement} */ (byId(id)).value);
+  const metres = (id) => Number(inputById(id).value);
 
   purifier.replaceChildren(
     ...Object.entries(PURIFIERS).map(([id, p]) => h('option', { value: id, selected: id === 'medium' }, p.label)),
@@ -60,7 +69,10 @@ export function initRoomPanel() {
     announceTimer = window.setTimeout(() => announce(status, text), ANNOUNCE_DELAY_MS);
   };
 
-  /** @param {boolean} speak announce the result (only after the user changes something) */
+  /**
+   * Recalculate the room from the form and the night-time outdoor air.
+   * @param {boolean} speak announce the result (only after the user changes something)
+   */
   function run(speak) {
     const [lengthM, widthM, heightM] = [metres('room-l'), metres('room-w'), metres('room-h-in')];
     if (![lengthM, widthM, heightM].every((d) => d > 0 && d <= MAX_ROOM_SIDE_M)) {
@@ -68,9 +80,9 @@ export function initRoomPanel() {
       if (speak) sayLater('Enter room sizes between 1 and 20 metres.');
       return;
     }
-    const known = /** @type {number[]} */ ((state.forecast ?? SAMPLE_FORECAST).filter((v) => v !== null));
+    const known = (state.forecast ?? SAMPLE_FORECAST).filter((v) => v !== null);
     const outdoorPm = Math.max(...known.slice(-NIGHT_HOURS));
-    const chosen = PURIFIERS[/** @type {PurifierId} */ (purifier.value)];
+    const chosen = PURIFIERS[isPurifierId(purifier.value) ? purifier.value : 'medium'];
     const result = purifierPlan({
       lengthM,
       widthM,

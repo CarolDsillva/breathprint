@@ -1,9 +1,9 @@
 // @ts-check
 /** Neighbourhood ripple: what N families achieve together by making the same switches. */
-import { communityRipple } from '/engine/impact.js';
+import { communityRipple } from '/engine/index.js';
 import { renderRipple } from './budget-view.js';
 import { announce } from './components.js';
-import { byId, fmt, fmt1, h } from './dom.js';
+import { byId, fmt, fmt1, h, inputById } from './dom.js';
 
 /** @typedef {import('./types.js').DayResult} DayResult */
 
@@ -17,14 +17,17 @@ const RANGE_MESSAGE = 'Enter between 1 and 100,000 families.';
  * @returns {{ show: (baseline: DayResult, smarter: DayResult) => void }} redraw with new day results
  */
 export function initRipplePanel() {
-  const families = /** @type {HTMLInputElement} */ (byId('families'));
+  const families = inputById('families');
   const out = byId('ripple-out');
   const status = byId('ripple-announce');
   /** @type {{ baseline: DayResult, smarter: DayResult } | null} */
   let days = null;
   let timer = 0;
 
-  /** @param {boolean} speak announce the totals (only when the user changes the number) */
+  /**
+   * Redraw the neighbourhood totals for the number of families entered.
+   * @param {boolean} speak announce the totals (only when the user changes the number)
+   */
   function update(speak) {
     if (!days) return;
     const n = Number(families.value);

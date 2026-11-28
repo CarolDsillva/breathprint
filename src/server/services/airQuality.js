@@ -13,7 +13,10 @@ export class UpstreamError extends Error {}
  * @param {{ fetchImpl?: typeof fetch, now?: () => number }} [deps]
  */
 export function createAirQualityService({ fetchImpl = fetch, now = Date.now } = {}) {
-  /** @param {string | URL} url */
+  /**
+   * GET a JSON document with a timeout, failing on non-2xx answers.
+   * @param {string | URL} url
+   */
   async function getJson(url) {
     const res = await fetchImpl(url, {
       signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -23,7 +26,8 @@ export function createAirQualityService({ fetchImpl = fetch, now = Date.now } = 
     return res.json();
   }
 
-  const forecastCache = /** @type {TtlCache<Forecast>} */ (new TtlCache({ ttlMs: 30 * 60_000, max: 500, now }));
+  /** @type {TtlCache<Forecast>} */
+  const forecastCache = new TtlCache({ ttlMs: 30 * 60_000, max: 500, now });
   const loadForecast = cached(forecastCache, async (key) => {
     const [lat, lon] = key.split(',');
     const url = new URL(FORECAST_URL);
@@ -37,7 +41,8 @@ export function createAirQualityService({ fetchImpl = fetch, now = Date.now } = 
     return parseForecast(await getJson(url));
   });
 
-  const placeCache = /** @type {TtlCache<Place[]>} */ (new TtlCache({ ttlMs: 24 * 60 * 60_000, max: 500, now }));
+  /** @type {TtlCache<Place[]>} */
+  const placeCache = new TtlCache({ ttlMs: 24 * 60 * 60_000, max: 500, now });
   const loadPlaces = cached(placeCache, async (q) => {
     const url = new URL(GEOCODE_URL);
     url.search = new URLSearchParams({ name: q, count: '5', language: 'en', format: 'json' }).toString();
@@ -89,8 +94,11 @@ export function parseForecast(body) {
     const [date, clock] = t.split('T');
     const hour = Number(clock?.slice(0, 2));
     if (!Number.isInteger(hour) || hour < 0 || hour > 23) return;
-    if (!days.has(date)) days.set(date, { date, pm25: new Array(24).fill(null), aqi: new Array(24).fill(null) });
-    const day = /** @type {NonNullable<ReturnType<typeof days.get>>} */ (days.get(date));
+    let day = days.get(date);
+    if (!day) {
+      day = { date, pm25: new Array(24).fill(null), aqi: new Array(24).fill(null) };
+      days.set(date, day);
+    }
     day.pm25[hour] = toNum(pm[i]);
     day.aqi[hour] = Array.isArray(aqi) ? toNum(aqi[i]) : null;
   });
@@ -122,7 +130,10 @@ export function parsePlaces(body) {
   return places;
 }
 
-/** @param {unknown} v */
+/**
+ * A finite number rounded to 0.1, or null.
+ * @param {unknown} v
+ */
 function toNum(v) {
   return typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10) / 10 : null;
 }

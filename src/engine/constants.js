@@ -18,6 +18,8 @@ export const CIGARETTE_EXPOSURE = 22 * 24;
 /** Intensity levels a person can be at during an activity. */
 export const INTENSITIES = /** @type {const} */ (['sleep', 'rest', 'light', 'moderate', 'vigorous']);
 
+/** @typedef {typeof INTENSITIES[number]} Intensity */
+
 /**
  * Breathing (ventilation) rate in m³/hour by age group and intensity.
  * US EPA Exposure Factors Handbook 2011, Table 6-2 (means, rounded).
@@ -69,42 +71,50 @@ export const PLACE_RATIO = Object.freeze({
  * Indian fleet averages. `perVehicle` means the figure is shared by everyone riding together;
  * otherwise it is per passenger (shared transit).
  */
-export const MODES = Object.freeze({
-  walk: { label: 'Walk', ratio: 1.3, intensity: 'light', speed: 5, co2: 0, pm: 0, perVehicle: false, maxKm: 2.5 },
-  cycle: { label: 'Cycle', ratio: 1.3, intensity: 'moderate', speed: 14, co2: 0, pm: 0, perVehicle: false, maxKm: 8 },
-  'two-wheeler': {
-    label: 'Two-wheeler',
-    ratio: 1.5,
-    intensity: 'rest',
-    speed: 25,
-    co2: 45,
-    pm: 15,
-    perVehicle: true,
-    maxKm: 60,
-  },
-  auto: {
-    label: 'Auto-rickshaw (CNG)',
-    ratio: 1.4,
-    intensity: 'rest',
-    speed: 20,
-    co2: 60,
-    pm: 8,
-    perVehicle: true,
-    maxKm: 30,
-  },
-  car: {
-    label: 'Car (windows up, recirculate)',
-    ratio: 0.6,
-    intensity: 'rest',
-    speed: 22,
-    co2: 140,
-    pm: 10,
-    perVehicle: true,
-    maxKm: 200,
-  },
-  bus: { label: 'Bus', ratio: 1.1, intensity: 'rest', speed: 18, co2: 25, pm: 5, perVehicle: false, maxKm: 60 },
-  metro: { label: 'Metro', ratio: 0.6, intensity: 'rest', speed: 32, co2: 15, pm: 0.5, perVehicle: false, maxKm: 80 },
-});
+/**
+ * @typedef {{
+ *   label: string, ratio: number, intensity: Intensity, speed: number,
+ *   co2: number, pm: number, perVehicle: boolean, maxKm: number
+ * }} Mode
+ */
+export const MODES = Object.freeze(
+  /** @satisfies {Record<string, Mode>} */ ({
+    walk: { label: 'Walk', ratio: 1.3, intensity: 'light', speed: 5, co2: 0, pm: 0, perVehicle: false, maxKm: 2.5 },
+    cycle: { label: 'Cycle', ratio: 1.3, intensity: 'moderate', speed: 14, co2: 0, pm: 0, perVehicle: false, maxKm: 8 },
+    'two-wheeler': {
+      label: 'Two-wheeler',
+      ratio: 1.5,
+      intensity: 'rest',
+      speed: 25,
+      co2: 45,
+      pm: 15,
+      perVehicle: true,
+      maxKm: 60,
+    },
+    auto: {
+      label: 'Auto-rickshaw (CNG)',
+      ratio: 1.4,
+      intensity: 'rest',
+      speed: 20,
+      co2: 60,
+      pm: 8,
+      perVehicle: true,
+      maxKm: 30,
+    },
+    car: {
+      label: 'Car (windows up, recirculate)',
+      ratio: 0.6,
+      intensity: 'rest',
+      speed: 22,
+      co2: 140,
+      pm: 10,
+      perVehicle: true,
+      maxKm: 200,
+    },
+    bus: { label: 'Bus', ratio: 1.1, intensity: 'rest', speed: 18, co2: 25, pm: 5, perVehicle: false, maxKm: 60 },
+    metro: { label: 'Metro', ratio: 0.6, intensity: 'rest', speed: 32, co2: 15, pm: 0.5, perVehicle: false, maxKm: 80 },
+  }),
+);
 
 /**
  * Indoor sources add to the room's PM2.5 while the activity runs (µg/m³ above background).
